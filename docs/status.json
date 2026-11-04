@@ -1,19 +1,19 @@
 {
  "updated": "2026-11-04",
  "card_types": 1,
- "pack_versions": 3,
+ "pack_versions": 4,
  "templates": 2,
  "labeled_cells": 369,
  "labeled_pages": 49,
- "runs": 1,
+ "runs": 2,
  "experiments": 4,
  "best_pack": {
-  "name": "anc v5",
+  "name": "anc v6",
   "shipped": 3,
   "fields": 22
  },
  "last_run": {
-  "name": "run1",
+  "name": "run-20261104-170751",
   "exact": 0.7289972899728997,
   "lo": 0.6814587870389814,
   "hi": 0.7718168131086416,

@@ -1,8 +1,9 @@
-# Studio
+# Studio and card-pack tools
 numpy
 opencv-python
 onnxruntime
 pillow
 pypdfium2
+jsonschema
 # Training only (work_phaseA, studio/trainer.py)
 # torch

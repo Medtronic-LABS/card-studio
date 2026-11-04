@@ -47,7 +47,7 @@ cardpack/out/
 __pycache__/
 .DS_Store
 """
-REQUIREMENTS = "# Studio\nnumpy\nopencv-python\nonnxruntime\npillow\npypdfium2\n# Training only (work_phaseA, studio/trainer.py)\n# torch\n"
+REQUIREMENTS = "# Studio and card-pack tools\nnumpy\nopencv-python\nonnxruntime\npillow\npypdfium2\njsonschema\n# Training only (work_phaseA, studio/trainer.py)\n# torch\n"
 CI = """name: ci
 on: [push, pull_request]
 jobs:
@@ -58,7 +58,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install numpy opencv-python-headless onnxruntime pillow pypdfium2
+      - run: pip install numpy opencv-python-headless onnxruntime pillow pypdfium2 jsonschema
       - run: python tools/leakcheck.py .
       - run: CARDPACK_SYNTHETIC=1 python cardpack/test_cardpack.py
       - run: python -m unittest discover -s studio/tests
@@ -131,6 +131,17 @@ def main():
     print(r.stdout.strip() or r.stderr.strip())
     if r.returncode: sys.exit("push failed")
     v = run(["gh", "repo", "view", REPO, "--json", "visibility,url", "-q", ".visibility + \" \" + .url"]); print("published:", v.stdout.strip())
+    # CI runs on a clean machine: it is the check that catches what only works here (a missing dependency, a path). Wait for it and report.
+    import time
+    sha = run(["git", "rev-parse", "HEAD"], cwd=DST).stdout.strip(); rid = None
+    for _ in range(12):
+        out = run(["gh", "run", "list", "--repo", REPO, "--commit", sha, "--json", "databaseId", "-q", ".[0].databaseId"]).stdout.strip()
+        if out: rid = out; break
+        time.sleep(5)
+    if not rid: print("CI: no run found yet (check the Actions tab)"); return
+    r = run(["gh", "run", "watch", rid, "--repo", REPO, "--exit-status"]); c = run(["gh", "run", "view", rid, "--repo", REPO, "--json", "conclusion", "-q", ".conclusion"]).stdout.strip()
+    print(f"CI on GitHub: {c.upper()}  (https://github.com/{REPO}/actions/runs/{rid})")
+    if c != "success": sys.exit("CI FAILED on the pushed commit: fix forward and publish again")
 
 
 if __name__ == "__main__":

@@ -30,7 +30,7 @@ A field is shipped only if the **lower end of its 95% interval**, measured on pa
 ## Quick start
 
 ```sh
-pip install numpy opencv-python onnxruntime pillow pypdfium2    # Studio
+pip install numpy opencv-python onnxruntime pillow pypdfium2 jsonschema    # Studio
 pip install torch                                              # only for training
 python studio/server.py                                        # http://127.0.0.1:8770
 ```
