@@ -1,0 +1,48 @@
+{
+ "captured": "2026-11-04",
+ "mode": "?shots=1 (no patient images are built)",
+ "screenshots": [
+  {
+   "file": "docs/screenshots/dashboard.png",
+   "view": "dashboard",
+   "caption": "Dashboard: model registry, getting started, activity, needs attention, field readiness",
+   "sha256": "f2fcd3544067ab59666e26f5e879a18c580c8593a832bd4f2bc9db480ae30b06",
+   "images_on_page": 0
+  },
+  {
+   "file": "docs/screenshots/model-quality.png",
+   "view": "model-quality",
+   "caption": "Model quality: per-field errors, calibration, risk-coverage, confusions, flag-policy tuner, provenance",
+   "sha256": "6f2f9653aee97369d28ea696de52a0d83a65f58f0fb299dfc9c229f2d5db2482",
+   "images_on_page": 0
+  },
+  {
+   "file": "docs/screenshots/history.png",
+   "view": "history",
+   "caption": "History: training runs, paired comparison, experiment records",
+   "sha256": "f6421acf3516383b9dc21d238a6d82def2b5cbd018af1a45a937923987f3c2cf",
+   "images_on_page": 0
+  },
+  {
+   "file": "docs/screenshots/train-and-ship.png",
+   "view": "train-and-ship",
+   "caption": "Train and ship: held-out gate per field",
+   "sha256": "055d789135a8003814eb744b65230317e0993580bd3d87330f4fae32564cf5fc",
+   "images_on_page": 0
+  },
+  {
+   "file": "docs/screenshots/clean-up-lab.png",
+   "view": "clean-up-lab",
+   "caption": "Photo clean-up lab (empty state)",
+   "sha256": "7a63837b2e6b4794fc0225d780cc96eed17e7b863499da170419b15a88124823",
+   "images_on_page": 0
+  },
+  {
+   "file": "docs/screenshots/label.png",
+   "view": "label",
+   "caption": "Label and import corrected labels",
+   "sha256": "0202a05f70092482177cd53730b1f7a35fd9be8302da3128fecb6ffb246db298",
+   "images_on_page": 0
+  }
+ ]
+}

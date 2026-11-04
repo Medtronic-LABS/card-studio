@@ -1,0 +1,30 @@
+{
+ "updated": "2026-11-04",
+ "card_types": 1,
+ "pack_versions": 3,
+ "templates": 2,
+ "labeled_cells": 369,
+ "labeled_pages": 49,
+ "runs": 1,
+ "experiments": 4,
+ "best_pack": {
+  "name": "anc v5",
+  "shipped": 3,
+  "fields": 22
+ },
+ "last_run": {
+  "name": "run1",
+  "exact": 0.7289972899728997,
+  "lo": 0.6814587870389814,
+  "hi": 0.7718168131086416,
+  "cer": 0.28933333333333333,
+  "ece": 0.1143416954572931,
+  "silent_error_rate": 0.10569105691056911,
+  "coverage": 0.7804878048780488,
+  "policy_accuracy": 0.8645833333333334,
+  "shipped": 3,
+  "fields": 18,
+  "n_cells": 369,
+  "n_pages": 49
+ }
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "cardpack fallback",
+  "type": "object", "additionalProperties": false, "required": ["engine", "when", "image_px", "prompt", "apply_field_checks"],
+  "properties": {
+    "engine": {"enum": ["qwen3-vl", "none"]},
+    "when": {"enum": ["flagged", "never"]},
+    "image_px": {"type": "integer", "minimum": 64},
+    "prompt": {"enum": ["short", "full"]},
+    "apply_field_checks": {"type": "boolean", "description": "run the same range / valid-value checks on the fallback's output"}
+  }
+}

@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Card Studio</title>
+<link rel="stylesheet" href="/vendor/tabler.min.css">
+<script>if(/[?&]shots=1/.test(location.search))document.documentElement.classList.add('shots');/* screenshot mode: patient crops and previews are never built */</script>
+<script>/* theme: mode (system|light|dark) and accent, remembered in this browser only */
+var ACCENTS={blue:'#066fd1',indigo:'#4263eb',teal:'#0a7f5c',green:'#1a7f31',orange:'#c2410c',red:'#d63939',purple:'#ae3ec9'};
+function themeGet(k,d){var q=new URLSearchParams(location.search).get(k==='cs-mode'?'mode':'accent');if(q)return q;try{return localStorage.getItem(k)||d}catch(e){return d}}   /* ?mode=light&accent=teal overrides for one load */
+function themeSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function applyTheme(){var mode=themeGet('cs-mode','system'),acc=ACCENTS[themeGet('cs-accent','blue')]||ACCENTS.blue,dark=mode==='dark'||(mode==='system'&&matchMedia('(prefers-color-scheme: dark)').matches),r=document.documentElement;
+ r.setAttribute('data-bs-theme',dark?'dark':'light');r.style.setProperty('--tblr-primary',acc);r.style.setProperty('--tblr-primary-rgb',[1,3,5].map(function(i){return parseInt(acc.substr(i,2),16)}).join(','));r.style.setProperty('--tblr-link-color',acc)}
+applyTheme();try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme)}catch(e){}
+</script>
+<style>
+:root{--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--bg:var(--tblr-body-bg);--card:var(--tblr-bg-surface);--ink:var(--tblr-body-color);--mut:var(--tblr-secondary-color);--line:var(--tblr-border-color);--acc:var(--tblr-primary);--ok:#157f3b;--warn:#b54708;--bad:#b42318}
+:root[data-bs-theme=dark]{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--ok:#4ac37a;--warn:#f0a050;--bad:#f27a6e}
+body{font-size:14px}
+.app{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
+.side-nav{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:14px;padding:16px 12px;background:var(--card);border-right:1px solid var(--line)}
+.brand{display:flex;gap:10px;align-items:center;cursor:pointer;padding:4px 6px}.brand svg{flex:none}.brand b{font-size:15px;display:block;line-height:1.1}.brand span{font-size:11px;color:var(--mut)}
+#tabs{gap:2px}#tabs .nav-link{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;color:var(--ink);cursor:pointer}#tabs .nav-link svg{width:18px;height:18px;flex:none;opacity:.75}
+#tabs .nav-link:hover{background:var(--tblr-bg-surface-secondary,rgba(128,128,128,.12))}#tabs .nav-link.on{background:var(--tblr-primary);color:#fff;font-weight:600}#tabs .nav-link.on svg{opacity:1}
+.appearance{margin-top:auto;padding-top:10px;border-top:1px solid var(--line)}.appearance .subheader{font-size:11px;margin-bottom:6px}.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.seg button{flex:1;border:0;background:none;color:var(--ink);padding:5px 4px;font:inherit;font-size:12px;cursor:pointer}.seg button+button{border-left:1px solid var(--line)}.seg button[aria-pressed=true]{background:var(--tblr-primary);color:#fff}.swatches{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap}.swatches button{width:20px;height:20px;border-radius:50%;border:2px solid transparent;padding:0;cursor:pointer}.swatches button[aria-pressed=true]{border-color:var(--ink);outline:2px solid var(--card);outline-offset:-4px}.seg button:focus-visible,.swatches button:focus-visible{outline:2px solid var(--tblr-primary);outline-offset:2px}
+.privacy{margin-top:12px;font-size:11px;color:var(--mut);border-top:1px solid var(--line);padding-top:10px;display:flex;gap:8px;align-items:flex-start}.privacy svg{flex:none;margin-top:1px}
+main{padding:20px 28px 40px;max-width:1280px;width:100%}.page-header{margin-bottom:16px}.page-title{font-size:22px;margin:0}div.tag,p.tag{display:block}.tag{display:inline;height:auto;min-height:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;font-size:12px;font-weight:400;line-height:inherit;color:var(--mut)}
+.dashgrid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:14px;margin-bottom:14px;align-items:start}@media(max-width:1000px){.dashgrid{grid-template-columns:1fr}}.dashgrid .card{margin:0}
+.attn{list-style:none;margin:0;padding:0}.attn li{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--line)}.attn li:first-child{border-top:0}.attn .dot{flex:none;width:9px;height:9px;border-radius:50%;margin-top:6px}.attn .dot.warn{background:var(--warn)}.attn .dot.info{background:var(--s1)}.attn .dot.ok{background:var(--ok)}.attn b{display:block;font-weight:600}.attn a{cursor:pointer;text-decoration:underline;color:var(--acc)}
+.rd{display:grid;grid-template-columns:150px minmax(0,1fr) 72px 88px;gap:6px 10px;align-items:center;font-size:12px}.rd .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rd .bar{position:relative;height:10px;background:var(--line);border-radius:5px}.rd .bar i{position:absolute;top:0;height:10px;background:var(--s1);opacity:.55;border-radius:5px}.rd .bar u{position:absolute;top:-2px;width:3px;height:14px;background:var(--ink);text-decoration:none}.rd .bar s{position:absolute;top:-4px;width:0;height:18px;border-left:1px dashed var(--mut);text-decoration:none}.rd .nn{text-align:right;color:var(--mut);font-variant-numeric:tabular-nums}
+.stat.link{cursor:pointer;transition:border-color .15s}.stat.link:hover{border-color:var(--acc)}.trend svg{width:100%;height:auto;display:block}.trend text{fill:var(--mut);font:11px system-ui}
+.mlnav{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}.mlitem{text-align:left;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--card);color:var(--ink);cursor:pointer;font:inherit}.mlitem.on{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}.mlitem b{display:block}.mlitem .kind{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}.stg{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.stg span{padding:3px 10px;border-radius:999px;font-size:12px;border:1px solid var(--line)}.stg span.ok{background:rgba(47,179,68,.15);border-color:transparent;color:var(--ok)}.fbgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:10px}.fbt{border:1px solid var(--line);border-radius:8px;padding:8px;margin:0;background:var(--card);font-size:12px}.fbt img{display:block;height:48px;max-width:100%;background:#fff;border-radius:4px;border:1px solid var(--line)}.fbt .rd2{font-family:ui-monospace,Menlo,monospace;font-size:14px;margin-top:6px}.fbt .rd2 .x{color:var(--bad);font-weight:700}.fbt .cf{height:4px;background:var(--line);border-radius:2px;margin-top:5px}.fbt .cf i{display:block;height:4px;border-radius:2px;background:var(--s2)}.srcb{font-size:11px}.tune{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}@media(max-width:900px){.tune{grid-template-columns:1fr}}.tune .k b{font-size:20px;display:block}.tune .k{display:inline-block;margin:0 18px 8px 0}.shots #tpls,.shots #gridpanel,.shots #res,.shots #rdetail{display:none!important}.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}.kpis .card{margin:0;padding:12px 14px}.kpis .h1{font-size:22px;margin:2px 0;font-weight:700}.kpis .subheader{font-size:10.5px}
+.mlg{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px;margin-bottom:14px}.mlg .card{margin:0}.mlg svg{width:100%;height:auto;display:block}.mlg text{fill:var(--mut);font:11px system-ui}
+.heat{border-collapse:collapse;font-size:11px}.heat td,.heat th{padding:0;text-align:center;width:22px;height:22px;border:1px solid var(--line);font-weight:400}.heat th{color:var(--mut);border:0}
+.bar2{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--line)}.bar2 i{display:block;height:100%}
+.hero{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;margin:0 0 16px;padding-bottom:14px;border-bottom:1px solid var(--line)}.hero h1{font-size:20px;margin:0 0 4px}.hero p{margin:0;color:var(--mut);max-width:62ch}.hero .bd{display:flex;gap:6px;flex-wrap:wrap}.hero .badge{font-weight:500;font-size:12px}
+.homegrid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:14px;margin-bottom:14px;align-items:start}@media(max-width:1000px){.homegrid{grid-template-columns:1fr}}.homegrid>div>.card{margin-bottom:14px}
+.reg{border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px;background:var(--card)}.reg:last-child{margin-bottom:0}.reg h3{font-size:15px;margin:0;font-weight:600;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.reg h3 code{font-size:12px;color:var(--mut);font-weight:400}
+.reg .vers{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.reg .ver{border:1px solid var(--line);border-radius:6px;padding:3px 9px;font-size:12px;cursor:pointer;background:none;color:var(--ink);display:inline-flex;gap:6px;align-items:center}.reg .ver.on{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc);font-weight:600}
+.reg .tags{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.reg .tags span{font-size:11.5px;padding:2px 8px;border-radius:999px;background:var(--tblr-bg-surface-secondary,rgba(128,128,128,.12));color:var(--ink)}
+.reg .mx{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:10px 0;padding:10px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.reg .mx b{display:block;font-size:17px}.reg .mx span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+.feed{list-style:none;margin:0;padding:0 0 0 4px}.feed li{position:relative;padding:0 0 14px 22px;font-size:13px}.feed li:before{content:"";position:absolute;left:4px;top:6px;width:9px;height:9px;border-radius:50%;background:var(--s1)}.feed li:after{content:"";position:absolute;left:8px;top:16px;bottom:-2px;width:1px;background:var(--line)}.feed li:last-child:after{display:none}.feed li.run:before{background:var(--s3)}.feed li.tpl:before{background:var(--s2)}
+.chk{list-style:none;margin:0;padding:0}.chk li{display:flex;gap:10px;padding:7px 0;align-items:flex-start;font-size:13px;border-top:1px solid var(--line)}.chk li:first-child{border-top:0}.chk i{flex:none;width:18px;height:18px;border-radius:50%;border:2px solid var(--line);margin-top:1px;display:grid;place-items:center;font-style:normal;font-size:11px;color:#fff}.chk li.done i{background:var(--ok);border-color:var(--ok)}.chk li.done b{color:var(--mut);text-decoration:line-through;font-weight:500}.chk a{cursor:pointer;text-decoration:underline;color:var(--acc)}.chkbar{height:6px;background:var(--line);border-radius:3px;margin:8px 0 6px}.chkbar div{height:6px;background:var(--ok);border-radius:3px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:14px}.stat{padding:14px 16px;margin:0}.stat .h1{font-size:26px;margin:4px 0 2px;font-weight:700}.stat .subheader{font-size:11px}
+.card{padding:16px;margin-bottom:14px}.card>h2,.card h2{margin:0 0 10px;font-size:15px;font-weight:600}
+table.table{width:100%;margin-bottom:0}table.table th{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}table.table td,table.table th{padding:8px 10px}
+.btn.on{outline:2px solid var(--acc)}.row input,.row select,.row button,.row label{width:auto;margin:0}.btn{margin:0}.side input,.side select{margin-bottom:4px}
+.row{--tblr-gutter-x:0;--tblr-gutter-y:0;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.row>*{width:auto;max-width:none;flex-shrink:1;margin-top:0}.row>*:not(.btn):not(input):not(select){padding:0}
+input:not([type=file]):not([type=checkbox]):not([type=radio]),select,textarea{font:inherit;padding:.4375rem .75rem;border:1px solid var(--line);border-radius:var(--tblr-border-radius,6px);background:var(--tblr-bg-forms,var(--card));color:var(--ink);max-width:100%}
+input:focus,select:focus{outline:0;border-color:var(--acc);box-shadow:0 0 0 .25rem rgba(var(--tblr-primary-rgb),.25)}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.hide{display:none}
+@media(max-width:860px){.app{grid-template-columns:1fr}.side-nav{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;border-right:0;border-bottom:1px solid var(--line)}#tabs{flex-direction:row!important;flex-wrap:wrap}.privacy{display:none}main{padding:14px 14px 30px}}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:28px;text-align:center;color:var(--mut)}.drop.over{border-color:var(--acc);color:var(--acc)}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.hide{display:none}
+.ed{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px}@media(max-width:900px){.ed{grid-template-columns:1fr}}
+.stage{overflow:auto;max-height:78vh;border:1px solid var(--line);border-radius:8px;background:#888}canvas{display:block}
+label{display:block;font-size:12px;color:var(--mut);margin-top:8px}.side input,.side select{width:100%}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:12px}.ch{border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--card)}.ch b{font-size:13px}.ch svg{width:100%;height:auto;display:block}.ch text{fill:var(--mut);font:11px system-ui}.lg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin:4px 0}.lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}.wide{grid-column:1/-1}.wide svg{max-width:780px;margin:0 auto}.num{width:7em!important;min-width:7em}.tool{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line)}.tool:first-of-type{border-top:0}
+.flow{display:flex;flex-wrap:wrap;gap:6px 0;align-items:stretch}.nd{width:128px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--card);font-size:12px}.nd b{font-size:12px;display:block}.nd .sh{color:var(--ink);font-variant-numeric:tabular-nums;margin-top:4px}.nd .pm,.nd .nt{color:var(--mut)}.nd svg{height:56px;width:100%;display:block;margin:4px 0}
+.ar{width:26px;position:relative;align-self:center;height:2px;background:var(--line);margin:0 2px}.ar::after{content:"";position:absolute;right:-1px;top:-4px;border:5px solid transparent;border-left:7px solid var(--mut);border-right:0}
+.ar i{position:absolute;top:-3px;left:0;width:8px;height:8px;border-radius:50%;background:var(--s1)}@media(prefers-reduced-motion:no-preference){.ar i{animation:mv 1.6s linear infinite}@keyframes mv{from{left:0;opacity:1}to{left:18px;opacity:.2}}}
+.nd.hl{border-color:var(--s1)}.nd.mk{border-color:var(--s2)}.nd.ok{border-color:var(--s3)}.fl{font-size:12px;color:var(--mut);margin:12px 0 4px}
+.big{font-size:20px;margin:6px 0 12px}.doors{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:14px}.door{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--card)}.door b{font-size:13px;letter-spacing:.04em}.door p{color:var(--mut);margin:6px 0 10px;font-size:13px}
+.drop{padding:18px}details.st{border-top:1px solid var(--line);padding:6px 0}details.st summary{cursor:pointer;color:var(--ink)}
+.msg{padding:8px 12px;border-radius:8px;border:1px solid var(--line);margin:8px 0}
+</style></head><body>
+<div class="app">
+<aside class="side-nav">
+ <div class="brand" onclick="home()"><svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="5" width="28" height="22" rx="4" fill="var(--tblr-primary)"/><path d="M7 12h18M7 17h18M7 22h10M14 8v16" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".9"/></svg><div><b>Card Studio</b><span>handwritten health cards</span></div></div>
+ <nav class="nav nav-pills flex-column" id="tabs"></nav>
+ <div class="appearance"><div class="subheader">Appearance</div>
+  <div class="seg" role="group" aria-label="Color mode" id="seg"></div>
+  <div class="swatches" role="group" aria-label="Accent color" id="swatches"></div></div>
+ <div class="privacy"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Local only · 127.0.0.1<br>Photos never leave this machine</span></div>
+</aside>
+<main>
+<div class="page-header"><div class="subheader" id="pg-sub"></div><h1 class="page-title" id="pg-title"></h1></div>
+<div id="home">
+ <div class="view" id="v-cards">
+  <div class="hero"><div><h1>Card Studio</h1><p>Teach the system a handwritten health card, measure how well it reads it on pages it has not seen, and ship a pack to the phone. Everything runs on this machine.</p></div><div class="bd" id="badges"></div></div>
+  <div class="stats" id="stats"></div>
+  <div class="homegrid"><div><div class="card"><h2>Model registry <span class="tag">card types and their versions</span></h2><div id="packs" class="tag">loading…</div></div>
+   <div class="card"><h2>Needs attention</h2><ul class="attn" id="attn"><li class="tag">loading…</li></ul></div></div>
+   <div><div class="card"><h2>Getting started <span class="tag" id="chkn"></span></h2><div class="chkbar"><div id="chkb" style="width:0"></div></div><ul class="chk" id="chk"></ul></div>
+   <div class="card" style="margin-top:14px"><h2>Activity</h2><ul class="feed" id="feed"><li class="tag">loading…</li></ul></div></div></div>
+  <div class="card"><h2>Field readiness <span class="tag" id="rdsub"></span></h2><div class="rd" id="rd"></div><div class="trend" id="trend"></div></div>
+  <h2 class="big" style="font-size:16px;font-weight:600">What do you want to do?</h2>
+  <div class="doors">
+   <div class="door"><b>IDENTIFY A CARD</b><p>Drop a photo. We find the matching template and show what was detected. Reading happens on the phone.</p>
+    <div class="drop" id="drop">Drop photo here or <button class="btn" onclick="file.click()">Browse</button><input id="file" type="file" accept="image/*,.pdf,.heic" class="hide"></div></div>
+   <div class="door"><b>ADD A NEW CARD TYPE</b><p>Drop a sample card. We detect the layout, you check and approve it as a template.</p>
+    <div class="drop" id="drop2">Drop photo here or <button class="btn" onclick="file2.click()">Browse</button><input id="file2" type="file" accept="image/*,.pdf,.heic" class="hide"></div></div>
+   <div class="door"><b>IMPROVE A READER</b><p>Label more cells, retrain, and see which fields are safe to ship.</p>
+    <div class="row"><button class="btn btn-primary" onclick="tab('train')">Open Train &amp; Ship</button><button class="btn" onclick="tab('label')">Label cells</button></div></div>
+  </div>
+  <div id="res"></div>
+  <div class="card"><h2>Layouts <span class="tag">templates in progress</span></h2><div id="tpls" class="tag">loading…</div><div id="gridpanel"></div></div>
+  <div class="card"><h2>Checks &amp; tools</h2>
+   <div class="tool"><div><b>Template identification test</b><div class="tag" id="idsum">loading…</div></div><a class="btn" href="/idtest" target="_blank" rel="noopener" style="text-decoration:none">Open report</a></div>
+   <div class="tool"><div><b>Label Studio</b><div class="tag">Optional local labeling UI (open source, Apache-2.0). Separate app on this machine; its labels are not imported here yet.</div></div><a class="btn" href="http://127.0.0.1:8780" target="_blank" rel="noopener" style="text-decoration:none">Open</a></div>
+  </div>
+ </div>
+ <div class="view hide" id="v-label"><div class="card"><h2>Label cells</h2><div id="lbody" class="tag">loading…</div></div></div>
+ <div class="view hide" id="v-train"><div class="card" id="gate"><h2>Train / Gate / Export <span class="tag">(ANC card, from the labeled cells)</span></h2><div id="gbody"></div></div></div>
+ <div class="view hide" id="v-history">
+  <div class="card"><h2>Training runs</h2><div class="tag">Every Train &amp; ship run is kept. Tick two runs to compare them field by field. Held-out numbers only (pooled 5-fold CV by page).</div>
+   <div id="runs" style="margin-top:8px">loading…</div>
+   <div class="row"><button class="btn btn-primary" id="cmpbtn" onclick="cmpGo()" disabled>Compare the two ticked runs</button><span class="tag" id="cmphint">Tick two runs.</span></div></div>
+  <div id="cmp"></div><div id="rdetail"></div>
+  <div class="card"><h2>Experiments <span class="tag">ablations and retraining tests run outside the trainer: question, data, seeds, numbers, sources</span></h2><div id="exps">loading…</div></div>
+ </div>
+ <div class="view hide" id="v-ml">
+  <div class="card"><h2>Card types and templates <span class="tag">pick one to see its runs and their quality</span></h2><div class="mlnav" id="mlnav">loading…</div></div>
+  <div id="mlruns"></div>
+  <div class="card" id="mlheadcard" style="display:none"><b id="mlhead"></b> <span class="tag" id="mlsub"></span></div>
+  <div id="mlbody"></div>
+ </div>
+ <div class="view hide" id="v-lab">
+  <div class="card"><h2>Try the photo clean-up options on one photo</h2>
+   <div class="tag">Upload a card photo. It is aligned to a card pack, cleaned up each way the app offers, and read with the pack's reader. Nothing is sent anywhere; previews are deleted after a day. There is no ground truth for an uploaded photo, so judge the reads against the card.</div>
+   <div class="row"><label>Card pack <select id="lpack"><option value="auto">Best match (newest on ties)</option></select></label></div>
+   <div class="drop" id="ldrop">Drop a card photo here or <button class="btn" onclick="lfile.click()">Browse</button><input id="lfile" type="file" accept="image/*,.pdf,.heic" class="hide"></div></div>
+  <div id="lres"></div>
+ </div>
+ <div class="view hide" id="v-how">
+  <div class="card" id="train" style="display:none"><h2>Training progress <span class="tag">(read-only, held-out by page)</span></h2><div id="tbody"></div></div>
+  <div class="card" id="arch"><h2>How it works <span class="tag">(the reader network and how a cell flows through it; shapes read from the real model)</span></h2><div id="abody"></div></div>
+ </div>
+</div>
+<div id="pview" class="hide">
+ <div class="card"><div class="row"><b id="pvtitle"></b><span class="tag" id="pvsub"></span><span style="flex:1"></span><button class="btn" onclick="home()">Back</button></div>
+  <div id="pvmsg"></div>
+  <div class="ed"><div class="stage"><canvas id="pvc"></canvas></div><div class="side"><b>Card pack</b><div id="pvinfo" class="tag"></div></div></div>
+  <div class="lg" style="margin-top:8px"><span><i style="background:#157f3b"></i>ship</span><span><i style="background:#b54708"></i>needs-review</span><span class="tag">Click a field below to highlight its row on the card.</span></div>
+  <div id="pvtable"></div></div>
+</div>
+<div id="editor" class="hide">
+ <div class="card"><div class="row"><b id="etitle"></b><span class="tag" id="estat"></span><span style="flex:1"></span>
+  <button class="btn" onclick="home()">Cancel</button><button class="btn btn-primary" id="approve">Approve…</button></div>
+  <div class="row"><button class="btn on" id="t-select" onclick="tool('select')">Select / move</button><button class="btn" id="t-add" onclick="tool('add')">Add field (drag)</button>
+   <button class="btn" onclick="del()">Delete</button><button class="btn" onclick="undo()">Undo</button><span class="tag" id="hint"></span></div>
+  <div class="ed"><div class="stage"><canvas id="cv"></canvas></div>
+   <div class="side"><b>Selected field</b><div id="props" class="tag">Click a box.</div>
+    <label>Fields (<span id="nf"></span>)</label><div id="list" style="max-height:260px;overflow:auto"></div></div></div></div>
+</div>
+</main>
+</div>
+<dialog id="dlg"><article><b>Approve layout</b>
+ <div id="sum" class="tag" style="margin:8px 0"></div><label>Template name</label><input id="tname" autocomplete="off" placeholder="e.g. anc_card" oninput="nameHint()" style="width:100%"><div class="tag" id="nmhint" style="margin-top:4px"></div><div id="derr" class="bad" role="alert" style="margin-top:6px;font-weight:600"></div>
+ <div class="row"><button class="btn" onclick="dlg.close()">Back to edit</button><button class="btn btn-primary" onclick="save()">Save template</button></div></article></dialog>
+<script>
+const GH0=location.hash;
+const $=id=>document.getElementById(id);let S={fields:[],sel:null,img:null,scale:1,tool:'select',hist:[],ctx:null};
+const KINDS=['text','number','date','bp','mark'];
+async function api(p,o){o=o||{};o.headers={...(o.headers||{}),'X-Card-Studio':'1'};const r=await fetch(p,o);const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);return j}
+function home(){$('res').innerHTML='';tab((location.hash||'#cards').slice(1))}
+async function loadTpls(){const t=await api('/api/templates');TPLNAMES=t.map(x=>x.name);$('tpls').innerHTML=t.length?'<table class="table table-vcenter"><tr><th>Name</th><th>Version</th><th>Fields</th><th>Saved</th><th></th></tr>'+t.map(x=>`<tr><td>${x.name}</td><td>v${x.latest}</td><td>${x.fields}${x.grid?` <span class="tag">· grid ${x.grid.rows}×${x.grid.cols}</span>`:''}</td><td>${x.created}</td><td><button class="btn" onclick="openT('${x.name}',${x.latest},'view')">View</button> <button class="btn" onclick="gridOpen('${x.name}',${x.latest})">Grid</button> <a class="btn" href="/api/template/${x.name}/${x.latest}/download" download>Download</a> <button class="btn" onclick="openT('${x.name}',${x.latest},'update')">Update</button></td></tr>`).join('')+'</table>':'No templates yet. Drop a photo above to create one.'}
+
+let GP=null;
+function gridOpen(name,ver){GP={name,ver};$('gridpanel').innerHTML=`<article style="margin-top:12px"><b>Reader grid for ${esc(name)} v${ver}</b> <span class="tag">Turns the detected cells into the rows and visit columns a card pack needs. Check the picture: if rows or columns are off, set how many label columns to skip and how many visit columns to keep, then Preview again.</span>
+ <div class="row" style="margin-top:8px"><label>Label columns to skip <input id="gl" type="number" min="0" max="20" value="0" class="num"></label><label>Visit columns to keep (blank = all) <input id="gd" type="number" min="1" max="60" class="num"></label>
+ <button class="btn" onclick="gridPreview()">Preview</button><button class="btn btn-primary" id="gsv" onclick="gridSave()" disabled>Save grid</button><button class="btn" onclick="$('gridpanel').innerHTML=''">Close</button></div><div id="gout" class="tag" style="margin-top:8px"></div></article>`;gridPreview()}
+function gridQS(){const l=$('gl').value||0,d=$('gd').value;return `label_cols=${l}${d?`&data_cols=${d}`:''}`}
+async function gridPreview(){const o=$('gout');o.textContent='Working…';$('gsv').disabled=true;
+ try{const r=await api(`/api/template/${GP.name}/${GP.ver}/grid?${gridQS()}`),g=r.grid,bad=r.errors.length;
+  o.innerHTML=`<div class="${bad?'bad':'ok'}"><b>${g.rows.length} rows × ${g.col_lines_top.length-1} visit columns</b>${bad?' · not valid: '+esc(r.errors.join('; ')):' · valid'}</div>${r.warnings.map(w=>`<div class="warn">${esc(w)}</div>`).join('')}
+   <div class="tag">Rows: ${g.rows.map(esc).join(', ')}. Rows named row_NN had no renamed label cell; rename cells in the editor to name them.</div>${drawGrid(g,r.image)}`;
+  $('gsv').disabled=!!bad}catch(e){o.innerHTML=`<span class="bad">${esc(e.message)}</span>`}}
+async function gridSave(){try{const r=await api('/api/template/grid',{method:'POST',body:JSON.stringify({name:GP.name,version:GP.ver,label_cols:+($('gl').value||0),data_cols:$('gd').value?+$('gd').value:null})});
+ $('gout').insertAdjacentHTML('afterbegin',`<div class="ok"><b>Saved grid.json</b> (${r.rows} rows × ${r.cols} columns)</div>`);loadTpls()}catch(e){$('gout').insertAdjacentHTML('afterbegin',`<div class="bad">${esc(e.message)}</div>`)}}
+function drawGrid(g,img){const [W,H]=img,xAt=(c,y)=>g.col_lines_top[c]+(g.col_lines_bot[c]-g.col_lines_top[c])*(y-g.y_ref_top)/(g.y_ref_bot-g.y_ref_top),nc=g.col_lines_top.length-1;let p='';
+ for(let c=0;c<nc;c++)for(let r=0;r<g.rows.length;r++){const ya=g.row_lines_by_col[c][r],yb=g.row_lines_by_col[c][r+1];
+  p+=`<polygon points="${xAt(c,ya)},${ya} ${xAt(c+1,ya)},${ya} ${xAt(c+1,yb)},${yb} ${xAt(c,yb)},${yb}" fill="var(--s1)" fill-opacity=".14" stroke="var(--s1)" stroke-width="${Math.max(1,W/900)}"><title>${esc(g.rows[r])} · visit ${c+1}</title></polygon>`}
+ return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:900px;margin-top:8px;border:1px solid var(--line);border-radius:8px" role="img" aria-label="Template with detected grid"><image href="/api/template/${GP.name}/${GP.ver}/image" width="${W}" height="${H}"/>${p}</svg>`}
+async function openT(name,ver,mode){const L=await api(`/api/template/${name}/${ver}/layout`);S.ctx={mode,name,base:{name,version:ver}};S.fields=L.fields;edit(`/api/template/${name}/${ver}/image`,`${mode==='view'?'View':'Update'} ${name} v${ver}`,mode==='view')}
+[['drop','file','identify'],['drop2','file2','new']].forEach(([d,f,mode])=>{const z=$(d);['dragover','dragenter'].forEach(e=>z.addEventListener(e,x=>{x.preventDefault();z.classList.add('over')}));
+ ['dragleave','drop'].forEach(e=>z.addEventListener(e,x=>{x.preventDefault();z.classList.remove('over')}));z.addEventListener('drop',e=>up(e.dataTransfer.files[0],mode));$(f).onchange=e=>{up(e.target.files[0],mode);e.target.value=''}});
+let ORI={rot:0,str:true,file:null};
+async function runAnalyze(){return S.up=await api(`/api/analyze?rotate=${ORI.rot}&straighten=${ORI.str?1:0}`,{method:'POST',body:ORI.file})}
+async function up(f,mode){if(!f)return;$('res').innerHTML='<div class="msg">Analyzing locally…</div>';ORI={rot:0,str:true,file:f};
+ try{const r=await runAnalyze();if(mode==='new')newPreview(r);else show(r)}catch(e){$('res').innerHTML=`<div class="msg bad">${e.message}</div>`}}
+function oriText(o){return o.straightened?`Levelled by ${(-o.tilt_deg).toFixed(1)}° (line agreement ${(o.confidence*100).toFixed(0)}%).`:o.confidence&&o.confidence>=0.3?'Already level.':ORI.str?'No clear ruling lines found, so it was not levelled. Check the picture.':'Auto-levelling is off.'}
+function newPreview(r){const o=r.orientation,st=r.layout.stats;
+ $('res').innerHTML=`<div class="card"><h2>Is the card the right way up?</h2><div class="tag">${oriText(o)} Rotate by quarter turns if it is sideways or upside down, then continue. The lines alone cannot tell which way is up.</div>
+  <div class="row"><button class="btn" onclick="oriTurn(270)" aria-label="rotate 90 degrees counter-clockwise">&#8634; 90&deg;</button><button class="btn" onclick="oriTurn(90)" aria-label="rotate 90 degrees clockwise">&#8635; 90&deg;</button><button class="btn" onclick="oriTurn(180)">180&deg;</button>
+   <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" ${ORI.str?'checked':''} onchange="ORI.str=this.checked;oriGo()"> Level automatically</label>
+   <button class="btn btn-primary" onclick="createNew()">Continue: ${st.cells} cells in ${st.rows} rows &rarr;</button></div>
+  <img src="/api/upload/${r.upload_id}/image" alt="the card as it will be used" style="max-width:100%;max-height:560px;border:1px solid var(--line);border-radius:8px;margin-top:6px"></div>`}
+async function oriTurn(d){ORI.rot=(ORI.rot+d)%360;oriGo()}
+async function oriGo(){try{newPreview(await runAnalyze())}catch(e){$('res').innerHTML=`<div class="msg bad">${e.message}</div>`}}
+function show(r){const m=r.matches,b=m[0],st=r.layout.stats;let h='';
+ if(r.verdict==='known')h=`<div class="msg ok">Matches <b>${b.name} v${b.version}</b> (score ${b.score}).</div><div class="row"><button class="btn" onclick="openT('${b.name}',${b.version},'update')">Update ${b.name}</button><button class="btn" onclick="createNew()">Create new instead</button></div>`;
+ else if(r.verdict==='similar')h=`<div class="msg warn">Looks like <b>${b.name}</b> (score ${b.score}) but the layout differs. It will not be read with that template.</div><div class="row"><button class="btn" onclick="openT('${b.name}',${b.version},'update')">Update ${b.name}</button><button class="btn btn-primary" onclick="createNew()">Create new instead</button></div>`;
+ else h=`<div class="msg warn"><b>NEW TYPE</b>${b?` (best score ${b.score} vs ${b.name})`:' (no templates yet)'}.</div><div class="row"><button class="btn btn-primary" onclick="createNew()">Create new template</button></div>`;
+ h+=`<div class="tag">Detected ${st.cells} cells in ${st.rows} rows, ${st.marks} checkbox-like. Printed labels are not read (no local OCR engine installed), so fields are named r1_c1… for you to rename.</div>`;
+ if(m.length)h+='<div class="tag">Scores: '+m.map(x=>`${x.name} v${x.version} ${x.score}`).join(' · ')+`  (≥${r.thresholds.high} known, ≥${r.thresholds.mid} similar)</div>`;
+ h+=`<div class="card" style="margin-top:12px"><b>What it identified</b> <span class="tag">blue = cell, green = checkbox. Rows are numbered at the left.</span>
+  <div class="stage" style="margin-top:8px"><canvas id="pv"></canvas></div><div id="rowsum" class="tag" style="margin-top:8px"></div></div>`;
+ $('res').innerHTML=h;preview(r)}
+function preview(r){const im=new Image();im.onload=()=>{const cv=$('pv'),s=Math.min(1,1100/im.width);cv.width=im.width*s;cv.height=im.height*s;const c=cv.getContext('2d');c.drawImage(im,0,0,cv.width,cv.height);
+ const rows={};r.layout.fields.forEach(f=>{const m=/^r(\d+)_/.exec(f.name);const k=m?+m[1]:0;(rows[k]=rows[k]||{n:0,m:0,y:f.y});rows[k].n++;if(f.kind==='mark')rows[k].m++;rows[k].y=Math.min(rows[k].y,f.y);
+  c.lineWidth=2;c.strokeStyle=f.kind==='mark'?'#157f3b':'#2457d6';c.strokeRect(f.x*s,f.y*s,f.w*s,f.h*s)});
+ c.font='bold 13px system-ui';Object.entries(rows).forEach(([k,v])=>{c.fillStyle='#e11';c.fillText('r'+k,2,v.y*s+13)});
+ $('rowsum').textContent='Cells per row: '+Object.entries(rows).map(([k,v])=>`r${k}: ${v.n}${v.m?` (${v.m} box)`:''}`).join(' · ')};im.src=`/api/upload/${r.upload_id}/image`}
+function createNew(){const r=S.up;S.ctx={mode:'new',upload_id:r.upload_id};S.fields=r.layout.fields;edit(`/api/upload/${r.upload_id}/image`,'New template',false)}
+function edit(src,title,ro){S.ro=ro;S.sel=null;S.hist=[];$('home').classList.add('hide');$('editor').classList.remove('hide');$('etitle').textContent=title;
+ $('approve').style.display=ro?'none':'';$('hint').textContent=ro?'Read-only view.':'Drag to move · corner handle to resize · Delete key removes';
+ const im=new Image();im.onload=()=>{S.img=im;const cv=$('cv');S.scale=Math.min(1,1100/im.width);cv.width=im.width*S.scale;cv.height=im.height*S.scale;draw();list();props()};im.src=src}
+function tool(t){S.tool=t;$('t-select').classList.toggle('on',t==='select');$('t-add').classList.toggle('on',t==='add')}
+function snap(){S.hist.push(JSON.stringify(S.fields));if(S.hist.length>100)S.hist.shift()}
+function undo(){if(S.ro||!S.hist.length)return;S.fields=JSON.parse(S.hist.pop());S.sel=null;draw();list();props()}
+function del(){if(S.ro||S.sel==null)return;snap();S.fields=S.fields.filter(f=>f.id!==S.sel);S.sel=null;draw();list();props()}
+document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;if(e.key==='Delete'||e.key==='Backspace')del();if((e.ctrlKey||e.metaKey)&&e.key==='z')undo()});
+const col=k=>k==='mark'?'#157f3b':k==='number'||k==='date'||k==='bp'?'#2457d6':'#b54708';
+function draw(){const cv=$('cv'),c=cv.getContext('2d');c.clearRect(0,0,cv.width,cv.height);c.drawImage(S.img,0,0,cv.width,cv.height);
+ S.fields.forEach(f=>{const s=S.scale,sel=f.id===S.sel;c.lineWidth=sel?3:1.5;c.strokeStyle=sel?'#e11':col(f.kind);c.fillStyle=sel?'rgba(238,17,17,.12)':'rgba(36,87,214,.05)';
+  c.fillRect(f.x*s,f.y*s,f.w*s,f.h*s);c.strokeRect(f.x*s,f.y*s,f.w*s,f.h*s);if(sel){c.fillStyle='#e11';c.fillRect((f.x+f.w)*s-6,(f.y+f.h)*s-6,10,10)}})}
+function pt(e){const r=$('cv').getBoundingClientRect();return{x:(e.clientX-r.left)/S.scale,y:(e.clientY-r.top)/S.scale}}
+function hit(p){for(let i=S.fields.length-1;i>=0;i--){const f=S.fields[i];if(p.x>=f.x&&p.x<=f.x+f.w&&p.y>=f.y&&p.y<=f.y+f.h)return f}return null}
+let drag=null;$('cv').onmousedown=e=>{if(S.ro)return;const p=pt(e);
+ if(S.tool==='add'){snap();const f={id:'f'+Date.now(),name:freeFieldName(),kind:'text',section:'',x:p.x,y:p.y,w:1,h:1,range:'',charset:''};S.fields.push(f);S.sel=f.id;drag={m:'new',f,sx:p.x,sy:p.y};return}
+ const cur=S.fields.find(f=>f.id===S.sel);
+ if(cur&&Math.abs(p.x-(cur.x+cur.w))<10/S.scale&&Math.abs(p.y-(cur.y+cur.h))<10/S.scale){snap();drag={m:'size',f:cur};return}
+ const f=hit(p);S.sel=f?f.id:null;if(f){snap();drag={m:'move',f,ox:p.x-f.x,oy:p.y-f.y}}draw();props();list()};
+window.onmousemove=e=>{if(!drag)return;const p=pt(e),f=drag.f;
+ if(drag.m==='move'){f.x=Math.round(p.x-drag.ox);f.y=Math.round(p.y-drag.oy)}
+ else if(drag.m==='size'){f.w=Math.max(6,Math.round(p.x-f.x));f.h=Math.max(6,Math.round(p.y-f.y))}
+ else{f.x=Math.round(Math.min(p.x,drag.sx));f.y=Math.round(Math.min(p.y,drag.sy));f.w=Math.round(Math.abs(p.x-drag.sx));f.h=Math.round(Math.abs(p.y-drag.sy))}draw()};
+window.onmouseup=()=>{if(!drag)return;if(drag.m==='new'&&(drag.f.w<6||drag.f.h<6)){S.fields.pop();S.sel=null}drag=null;tool('select');draw();props();list()};
+function props(){const f=S.fields.find(x=>x.id===S.sel);if(!f){$('props').innerHTML='Click a box.';return}
+ const d=S.ro?'disabled':'';$('props').innerHTML=`<label>Name</label><input ${d} value="${f.name}" oninput="setp('name',this.value)">
+ <label>Kind</label><select ${d} onchange="setp('kind',this.value)">${KINDS.map(k=>`<option ${k===f.kind?'selected':''}>${k}</option>`).join('')}</select>
+ <label>Section</label><input ${d} value="${f.section}" oninput="setp('section',this.value)">
+ <label>Range (e.g. 30-150)</label><input ${d} value="${f.range}" oninput="setp('range',this.value)">
+ <label>Charset (e.g. 0-9.)</label><input ${d} value="${f.charset}" oninput="setp('charset',this.value)">
+ <label>x, y, w, h</label><div class="tag">${[f.x,f.y,f.w,f.h].map(Math.round).join(', ')}</div>`}
+function setp(k,v){const f=S.fields.find(x=>x.id===S.sel);f[k]=v;if(k==='kind')draw();list()}
+function list(){$('nf').textContent=S.fields.length;$('list').innerHTML=S.fields.map(f=>`<div style="cursor:pointer;padding:2px 4px;${f.id===S.sel?'background:var(--line)':''}" onclick="S.sel='${f.id}';draw();props();list()">${f.name} <span class="tag">${f.kind}</span></div>`).join('')}
+function freeFieldName(){const used=new Set(S.fields.map(f=>f.name));let k=S.fields.length+1;while(used.has('field_'+k))k++;return 'field_'+k}
+function dedupeNames(fs){const seen=new Set();let n=0;fs.forEach(f=>{const base=f.name;let k=2;while(seen.has(f.name))f.name=base+'_'+k++;if(f.name!==base)n++;seen.add(f.name)});return n}
+$('approve').onclick=()=>{const fixed=dedupeNames(S.fields),dup=0;list();
+ $('sum').innerHTML=`${S.fields.length} fields, ${S.fields.filter(f=>f.kind==='mark').length} checkbox${fixed?`<br><span class="warn">${fixed} duplicate name${fixed>1?'s were':' was'} renamed (suffix _2, _3). Rename them in the editor if you prefer.</span>`:''}`;
+ $('tname').value=S.ctx.name||suggestName();nameHint();$('tname').disabled=S.ctx.mode==='update';$('derr').textContent='';dlg.showModal()};
+let TPLNAMES=[];
+const cleanName=v=>v.trim().replace(/\s+/g,'_').replace(/[^A-Za-z0-9_-]/g,'').slice(0,40);
+function suggestName(){let n='new_card',i=2;while(TPLNAMES.includes(n))n='new_card_'+i++;return n}
+function nameHint(){const raw=$('tname').value,c=cleanName(raw),el=$('nmhint');
+ el.innerHTML=!c?'<span class="bad">Give it a name: letters, digits, _ or - (spaces become _).</span>':c!==raw.trim()?`Will be saved as <b>${esc(c)}</b>.`:TPLNAMES.includes(c)&&S.ctx.mode!=='update'?`<span class="warn">${esc(c)} already exists: saving makes a new version of it.</span>`:'Letters, digits, _ and - only.'}
+async function save(){try{const name=cleanName($('tname').value);if(!name){nameHint();$('derr').textContent='Please enter a template name.';return}
+ const body={name,fields:S.fields};if(S.ctx.mode==='update')body.base=S.ctx.base;else body.upload_id=S.ctx.upload_id;
+ const r=await api('/api/save',{method:'POST',body:JSON.stringify(body)});dlg.close();home();alert(`Saved ${r.name} v${r.version}`)}catch(e){$('derr').textContent=e.message}}
+
+const NS='http://www.w3.org/2000/svg',esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function lineChart(pts,key,title,note,{max=null,best=null,fmt=v=>v.toFixed(2),color='var(--s1)'}={}){
+ const W=320,H=190,L=40,R=10,T=10,B=28,xs=pts.map(p=>p.epoch),xm=Math.max(...xs,1),vals=pts.map(p=>p[key]);let ym=max??(Math.max(...vals)*1.1||1);
+ const X=e=>L+(W-L-R)*e/xm,Y=v=>T+(H-T-B)*(1-v/ym);let g='';
+ for(let i=0;i<=4;i++){const v=ym*i/4;g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L-5}" y="${Y(v)+4}" text-anchor="end">${fmt(v)}</text>`}
+ for(let i=0;i<=4;i++){const e=Math.round(xm*i/4);g+=`<text x="${X(e)}" y="${H-10}" text-anchor="middle">${e}</text>`}
+ g+=`<text x="${(L+W-R)/2}" y="${H-0}" text-anchor="middle">epoch</text>`;
+ if(best&&best<=xm)g+=`<line x1="${X(best)}" x2="${X(best)}" y1="${T}" y2="${H-B}" stroke="var(--mut)" stroke-dasharray="4 3"/><text x="${X(best)+4}" y="${T+10}">best ep ${best}</text>`;
+ g+=`<path d="${pts.map((p,i)=>(i?'L':'M')+X(p.epoch)+' '+Y(p[key])).join('')}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>`;
+ if(pts.length<=60)pts.forEach(p=>g+=`<circle cx="${X(p.epoch)}" cy="${Y(p[key])}" r="4" fill="${color}" stroke="var(--card)" stroke-width="2"><title>epoch ${p.epoch}: ${fmt(p[key])}</title></circle>`);
+ return `<div class="ch"><b>${title}</b><div class="tag">${note}</div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}">${g}</svg></div>`}
+function dotPlot(rows){
+ const W=640,rh=34,L=170,R=20,T=24,H=T+rows.length*rh+26,X=v=>L+(W-L-R)*v;let g='';
+ for(let i=0;i<=4;i++){const v=i/4;g+=`<line x1="${X(v)}" x2="${X(v)}" y1="${T-6}" y2="${H-24}" stroke="var(--line)"/><text x="${X(v)}" y="${H-8}" text-anchor="middle">${v*100}%</text>`}
+ rows.forEach((r,i)=>{const y=T+i*rh+rh/2;g+=`<text x="${L-8}" y="${y+4}" text-anchor="end" style="fill:var(--ink)">${esc(r.field)}</text><text x="${L-8}" y="${y+16}" text-anchor="end">test n=${r.n}, cv n=${r.cv_n??'-'}</text>`;
+  const mk=(v,lo,hi,dy,c,hollow,lab)=>{if(v==null)return'';let o=lo!=null?`<line x1="${X(lo)}" x2="${X(hi)}" y1="${y+dy}" y2="${y+dy}" stroke="${c}" stroke-width="2" opacity=".6"/>`:'';
+   return o+`<circle cx="${X(v)}" cy="${y+dy}" r="4.5" fill="${hollow?'var(--card)':c}" stroke="${c}" stroke-width="2"><title>${esc(r.field)} ${lab}: ${(v*100).toFixed(0)}%${lo!=null?` [95% CI ${(lo*100).toFixed(0)}-${(hi*100).toFixed(0)}]`:''}</title></circle>`};
+  g+=mk(r.exact,r.lo,r.hi,-8,'var(--s1)',false,'NEW held-out TEST')+mk(r.cv_exact,r.cv_lo,r.cv_hi,2,'var(--s2)',false,'NEW pooled CV')+mk(r.cur_exact,null,null,12,'var(--s3)',true,'CURRENT (trained on these)')});
+ return `<div class="ch wide"><b>Per-field exact match, with 95% Wilson intervals</b><div class="tag">Wide intervals are the finding: most fields have n&lt;10 on test. Hollow = current model, which trained on these cells (not accuracy).</div>
+ <div class="lg"><span><i style="background:var(--s1)"></i>NEW, held-out TEST</span><span><i style="background:var(--s2)"></i>NEW, pooled 5-fold CV</span><span><i style="border:2px solid var(--s3)"></i>CURRENT (trained on)</span></div>
+ <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Per-field exact match with confidence intervals">${g}</svg></div>`}
+function confHist(bins,cut){
+ const W=640,H=210,L=44,R=10,T=14,B=34,mx=Math.max(...bins.map(b=>Math.max(b.correct,b.wrong)),1),Y=v=>T+(H-T-B)*(1-v/mx),bw=(W-L-R)/10;let g='';
+ for(let i=0;i<=4;i++){const v=Math.round(mx*i/4);g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${L-5}" y="${Y(v)+4}" text-anchor="end">${v}</text>`}
+ bins.forEach((b,i)=>{const x=L+i*bw,w=(bw-8)/2;g+=`<text x="${x+bw/2}" y="${H-16}" text-anchor="middle">${b.lo.toFixed(1)}</text>`;
+  [['correct','var(--s1)',0],['wrong','var(--s2)',1]].forEach(([k,c,j])=>{const h=(H-B)-Y(b[k]);if(b[k])g+=`<path d="M${x+4+j*(w+2)} ${H-B}v${-Math.max(h,2)+4}q0 -4 4 -4h${w-8}q4 0 4 4v${Math.max(h,2)-4}z" fill="${c}"><title>conf ${b.lo.toFixed(1)}-${(b.lo+.1).toFixed(1)}: ${b[k]} ${k}</title></path>`})});
+ [[cut.marks,'marks 0.5'],[cut.numbers,'numbers 0.7']].forEach(([c,l],i)=>g+=`<line x1="${L+bw*10*c}" x2="${L+bw*10*c}" y1="${T}" y2="${H-B}" stroke="var(--mut)" stroke-dasharray="4 3"/><text x="${L+bw*10*c+4}" y="${T+10+i*12}">${l}</text>`);
+ g+=`<text x="${(L+W-R)/2}" y="${H-2}" text-anchor="middle">confidence (lowest per-character probability)</text>`;
+ return `<div class="ch wide"><b>Confidence of held-out reads (pooled CV): correct vs wrong</b><div class="tag">Reads below the dashed cutoff go to a person. Wrong reads sitting right of the line are the ones the flag misses.</div>
+ <div class="lg"><span><i style="background:var(--s1)"></i>correct</span><span><i style="background:var(--s2)"></i>wrong</span></div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Confidence histogram, correct vs wrong">${g}</svg></div>`}
+function renderCharts(t){const el=$('charts');if(!el)return;let h='';const hs=t.history||[],best=t.results?.best_epoch;
+ if(hs.length>1){const tag=t.history_full?'every epoch':'sampled every 25 epochs while running';
+  h+=lineChart(hs,'loss','Training loss (CTC)',tag,{best});
+  h+=lineChart(hs,'val_exact','Validation exact match',tag+'. Val = 7 pages, so noisy.',{max:1,best,fmt:v=>(v*100).toFixed(0)+'%',color:'var(--s1)'});
+  h+=lineChart(hs,'val_cer','Validation CER (lower is better)',tag,{max:1,best,color:'var(--s2)'})}
+ if(t.results){h+=dotPlot(t.results.fields.slice().sort((a,b)=>(b.cv_n||0)-(a.cv_n||0)));if(t.results.conf_bins)h+=confHist(t.results.conf_bins,t.results.cutoffs);
+  const f=t.results.flags,row=(n,s)=>`<tr><td>${n}</td><td>${s.n}</td><td>${s.flagged} (${(s.flag_rate*100).toFixed(0)}%)</td><td>${s.wrong_caught}/${s.wrong}</td><td>${s.unflagged_correct}/${s.unflagged} (${(s.unflagged_acc*100).toFixed(0)}%)</td></tr>`;
+  h+=`<div class="ch wide"><b>Flag rules (plausibility + confidence)</b><table class="table table-vcenter"><tr><th>Set</th><th>Cells</th><th>Flagged</th><th>Wrong reads caught</th><th>Unflagged accuracy</th></tr>${row('NEW, TEST',f.new_test.all)}${row('NEW, pooled CV',f.cv.all)}${row('CURRENT (trained on)',f.cur_all.all)}</table></div>`}
+ el.innerHTML=h}
+
+function glyph(c,h,w){const bw=Math.max(10,w/192*84),bh=Math.max(8,h/48*40),d=Math.min(5,Math.max(1,Math.round(c/32))),W=100,H=56;let g='';
+ for(let i=d-1;i>=0;i--){g+=`<rect x="${4+i*4}" y="${H-bh-4-i*3}" width="${bw}" height="${bh}" rx="2" fill="var(--s1)" opacity="${.25+.15*(d-i)}" stroke="var(--s1)"/>`}
+ return `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">${g}</svg>`}
+function renderArch(){
+ const N=[ // title, [c,h,w] or null, shape text, params, note, cls
+ ['Cell crop',[1,34,150],'any size, gray',null,'from aligned card; app also removes ruled lines + flattens light',''],
+ ['Resize + pad',[1,48,192],'1 × 48 × 192',0,'height to 48, keep aspect, pad white, scale to [-1, 1]',''],
+ ['Conv block 1',[32,24,96],'32 × 24 × 96',384,'3×3 conv, BN, ReLU, pool 2×2',''],
+ ['Conv block 2',[64,12,48],'64 × 12 × 48',18624,'same, pool 2×2',''],
+ ['Conv block 3',[128,6,48],'128 × 6 × 48',74112,'same, pool 2×1 (keeps width)',''],
+ ['Conv block 4',[128,1,48],'128 × 1 × 48',147840,'pool 6×1 collapses height; width stays 48',''],
+ ['Frames',[1,8,48],'48 steps × 128',0,'each step sees about 4 px of the 192 px width',''],
+ ['BiLSTM 128×2',[1,8,60],'48 × 256',264192,'left-to-right and right-to-left context','hl'],
+ ['Linear',[1,8,70],'48 × 129',33153,'one score per class per step (incl. blank)','hl'],
+ ['Field mask',[1,8,70],'allowed classes only',0,'e.g. weight_kg keeps 0-9 . - and blank; the rest set to -inf','mk'],
+ ['Softmax + CTC greedy',null,'"58"',0,'argmax per step, merge repeats, drop blanks','mk'],
+ ['Confidence',null,'min char prob 0.84',0,'lowest per-character probability at its emitting step','mk'],
+ ['Plausibility',null,'OK / review',0,'conf ≥ 0.7 (marks 0.5), clinical range, BP order, date validity','ok']];
+ const box=(n)=>`<div class="nd ${n[5]}"><b>${n[0]}</b>${n[1]?glyph(...n[1]):''}<div class="sh">${n[2]}</div>${n[3]!=null?`<div class="pm">${n[3]?n[3].toLocaleString()+' params':'no params'}</div>`:''}<div class="nt">${n[4]}</div></div>`;
+ const ar='<div class="ar"><i></i></div>';
+ const T=[['NumtaDB digits','55k real Bangla digit images, stitched into 4,000 fake numbers, dates and BP strings'],
+  ['Pretrain','15 epochs, lr 1e-3, CTC loss, field-masked'],['Labeled cells','split by PAGE: train / val / test, never mixed'],
+  ['Fine-tune','Adam, batch 64, field-balanced sampler, light augmentation (rotate, shift, brightness, blur)'],
+  ['Early stop','pick epoch by validation exact match, then CER (patience 80, max 300)'],['Test once','held-out pages scored a single time, with 95% Wilson intervals'],['Export','ONNX, run on phone']];
+ $('abody').innerHTML=`<div class="fl"><b>Inference: one cell, left to right</b> (dots show data moving)</div><div class="flow">${N.map(box).join(ar)}</div>
+ <div class="tag" style="margin-top:8px">Total 538,305 parameters (about 2.2 MB fp32). CNN turns the image into 48 vertical slices; the BiLSTM reads the slices as a sequence; CTC lets the model emit a character without knowing where it sits.</div>
+ <div class="fl"><b>Training: how the data is used</b></div><div class="flow">${T.map(t=>`<div class="nd"><b>${t[0]}</b><div class="nt">${t[1]}</div></div>`).join(ar)}</div>`}
+
+function gateRow(f){const pct=v=>(v*100).toFixed(0),ship=f.status==='ship';
+ return `<tr><td>${esc(f.field)}</td><td>${f.k}/${f.n}</td><td>${pct(f.exact)}%</td><td><div style="position:relative;height:10px;width:120px;background:var(--line);border-radius:5px" title="95% CI ${pct(f.lo)}-${pct(f.hi)}%"><div style="position:absolute;left:${f.lo*100}%;width:${(f.hi-f.lo)*100}%;height:10px;background:var(--s1);opacity:.6;border-radius:5px"></div><div style="position:absolute;left:${f.exact*100}%;top:-1px;width:3px;height:12px;background:var(--ink)"></div></div><span class="tag">${pct(f.lo)}-${pct(f.hi)}%</span></td><td>${f.cer.toFixed(2)}</td><td><span class="badge ${ship?'bg-green-lt':'bg-orange-lt'}">${ship?'SHIP':'needs-review'}</span><div class="tag">${esc(f.reason)}</div></td></tr>`}
+async function gatePoll(){try{const t=await api('/api/train/status');const run=t.state==='running'||t.state==='stalled';
+ let h=`<div class="row"><label>Target: lower 95% bound at least <input id="gt" type="number" min="50" max="100" value="${t.target??85}" class="num">%</label><label>Min held-out cells <input id="gn" type="number" min="1" value="${t.min_n??20}" class="num"></label><button class="btn btn-primary" id="gs" ${t.state==='running'?'disabled':''} onclick="gateStart()">Train + gate + export</button><a class="tag" href="http://127.0.0.1:8766" target="_blank">Label more cells (opens the labeler)</a></div>
+ <div class="tag">A field ships only if the lower end of its 95% interval, measured on pages the model never saw (pooled 5-fold CV), meets the target with enough cells. Otherwise it is needs-review. The shipped reader is trained on all pages; its held-out numbers come from the same recipe in CV.</div>`;
+ if(t.state!=='none'){const steps=['labels','cv','final','export','done'],i=Math.max(0,steps.indexOf(t.stage));
+  h+=`<div class="row" style="margin-top:8px"><b class="${t.state==='done'?'ok':t.state==='error'?'bad':'warn'}">${t.state.toUpperCase()}</b><span class="tag">stage ${steps.indexOf(t.stage)<0?t.stage:(i+1)+'/5 '+t.stage} · ${esc(t.detail||'')} · ${t.elapsed??0}s</span></div>
+  <div style="height:10px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:${t.state==='done'?100:i*20+(t.stage==='cv'?(t.cv_done||0)*3:0)}%;background:var(--acc)"></div></div>`}
+ if(t.results){const r=t.results,ok=!r.pack.validation_errors.length;
+  h+=`<div class="msg ${ok?'':'bad'}" style="margin-top:10px"><b>${ok?'Pack written and validated':'Pack failed validation'}:</b> ${esc(r.pack.id)} v${r.pack.version} · shipped fields: ${r.pack.shipped.length} of ${r.fields.length+r.unlabeled_fields.length} · <span class="tag">${esc(r.pack.path)}</span>
+  <div class="tag">${r.n_cells} labeled cells on ${r.n_pages} pages · pooled held-out exact ${(r.cv_all.exact*100).toFixed(0)}% [${(r.cv_all.lo*100).toFixed(0)}-${(r.cv_all.hi*100).toFixed(0)}] · final reader ${r.final_epochs} epochs · ONNX parity: max diff ${r.parity.max_abs_diff.toExponential(1)}, decoded text identical on ${r.parity.cells} cells · ${r.minutes} min</div></div>
+  <table class="table table-vcenter"><tr><th>Field</th><th>Held-out</th><th>Exact</th><th>95% interval</th><th>CER</th><th>Decision</th></tr>${r.fields.map(gateRow).join('')}</table>
+  ${r.unlabeled_fields.length?`<div class="tag">No labeled cells, so needs-review: ${r.unlabeled_fields.map(esc).join(', ')}</div>`:''}`}
+ $('gbody').innerHTML=h;if(run)setTimeout(gatePoll,4000);else setTimeout(gatePoll,30000)}catch(e){setTimeout(gatePoll,10000)}}
+async function gateStart(){try{await api('/api/train/start',{method:'POST',body:JSON.stringify({target:+$('gt').value,min_n:+$('gn').value})});gatePoll()}catch(e){alert(e.message)}}
+
+const TABS=[['cards','Cards'],['label','Label'],['train','Train & Ship'],['history','History'],['ml','Model quality'],['lab','Clean-up lab'],['how','How it works']];
+function tab(t){if(!TABS.some(x=>x[0]===t))t='cards';$('editor').classList.add('hide');$('pview').classList.add('hide');$('home').classList.remove('hide');
+ TABS.forEach(([k])=>$('v-'+k).classList.toggle('hide',k!==t));[...$('tabs').children].forEach((b,i)=>b.classList.toggle('on',TABS[i][0]===t));$('pg-sub').textContent=TITLES[t][0];$('pg-title').textContent=TITLES[t][1];
+ try{history.replaceState(null,'','#'+t)}catch(e){}if(t==='cards')refreshCards();if(t==='label')loadLabel();if(t==='history'){loadHistory();loadExperiments()};if(t==='lab')labInit();if(t==='ml')loadMLHome()}
+const ICON={cards: `<path d="M3 5h18v14H3z"/><path d="M3 10h18M8 5v14"/>`, label: `<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>`, train: `<path d="M4 19V9m6 10V5m6 14v-7m6 7H2"/>`, how: `<circle cx="12" cy="12" r="9"/><path d="M12 8v.01M11 12h1v4h1"/>`};const TITLES={cards:['Home','Dashboard'],label:['Data','Label cells'],train:['Reader','Train & ship'],history:['Runs','History & compare'],ml:['Evaluation','Model quality'],lab:['Try it','Photo clean-up lab'],how:['Under the hood','How it works']};
+$('tabs').innerHTML='';TABS.forEach(([k,n])=>{const b=document.createElement('a');b.className='nav-link';b.href='#'+k;b.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg><span>${n}</span>`;b.onclick=e=>{e.preventDefault();tab(k)};$('tabs').appendChild(b)});
+let REG={sel:{}};
+function when(ts){const d=Math.floor((Date.now()/1000-ts)/86400);return d<=0?'today':d===1?'yesterday':d<30?d+' days ago':new Date(ts*1000).toISOString().slice(0,10)}
+async function loadPacks(){const [packs,tpls,runs,lab]=await Promise.all([api('/api/packs'),api('/api/templates'),api('/api/runs'),api('/api/labels/summary')]);
+ let ml=null;try{ml=await api('/api/ml')}catch(e){}
+ const ok=packs.filter(x=>!x.error),byId={};ok.forEach(x=>(byId[x.id]=byId[x.id]||[]).push(x));
+ const details={};await Promise.all(ok.map(async x=>{try{details[x.file]=await api('/api/pack/'+encodeURIComponent(x.file)+'/detail')}catch(e){}}));
+ const ids=Object.keys(byId);
+ $('packs').innerHTML=ids.length?ids.map(id=>{const vs=byId[id].sort((a,b)=>b.version-a.version),cur=vs.find(v=>v.file===REG.sel[id])||vs[0],d=details[cur.file],m=d&&d.manifest,rd=m&&m.reader,pp=m&&m.preprocess,nz=pp&&pp.normalize,ho=cur.heldout;
+  const mlFile=ml?(ok.find(x=>ml.pack===x.id+' v'+x.version)||{}).file:null,sameReader=mlFile&&details[mlFile]&&m&&details[mlFile].manifest.files['reader.onnx']===m.files['reader.onnx'],mine=ml&&(ml.pack===id+' v'+cur.version||sameReader)?ml:null;
+  return `<div class="reg"><h3>${esc(m?m.name:id)} <code>${esc(id)}</code> <span class="badge ${cur.ship?'bg-green-lt':'bg-secondary-lt'}">${cur.ship} of ${cur.fields} fields ship</span></h3>
+   <div class="vers">${vs.map(v=>`<button class="ver ${v.file===cur.file?'on':''}" onclick="REG.sel['${esc(id)}']='${esc(v.file)}';loadPacks()" title="${v.ship} ship, ${v.review} need review${v.heldout?'':', no held-out evidence'}">v${v.version}<span class="badge ${v.ship?'bg-green-lt':'bg-secondary-lt'}">${v.ship}</span></button>`).join('')}<span class="tag" style="align-self:center">${vs.length} version${vs.length>1?'s':''}, newest first</span></div>
+   <div class="tags"><span>CRNN + CTC</span>${rd?`<span>${rd.input.height}×${rd.input.width} gray input</span><span>${esc(rd.decode)}</span>`:''}<span>${ho?'held-out evidence':'no held-out evidence'}</span><span>photo clean-up: ${esc(nz?nz.default:'flatten')}</span><span>created ${esc(cur.created)}</span></div>
+   ${mine?`<div class="tag" style="margin-top:8px">Held-out metrics from run ${esc(mine.run)}${ml.pack!==id+' v'+cur.version?` (${esc(ml.pack)}: this version has the identical reader)`:''}</div><div class="mx"><div><b>${f0(mine.overall.exact)}</b><span>held-out exact</span></div><div><b>${(mine.overall.cer*100).toFixed(1)}%</b><span>char error rate</span></div><div><b>${mine.model&&mine.model.params?(mine.model.params/1000).toFixed(0)+'k':'-'}</b><span>parameters</span></div><div><b>${mine.model?(mine.model.onnx_bytes/1048576).toFixed(1)+' MB':'-'}</b><span>ONNX size</span></div><div><b>${mine.model?mine.model.latency_ms_median+' ms':'-'}</b><span>per cell, CPU</span></div></div>`:`<div class="tag" style="margin:10px 0">${ho?'Metrics for this version are under Model quality only for the latest run.':'This version was never scored on pages it did not see, so every field is needs-review.'}</div>`}
+   <div class="row"><button class="btn" onclick="openPack('${esc(cur.file)}')">View</button><a class="btn" href="/api/pack/${esc(cur.file)}/download" download>Download</a><button class="btn btn-primary" onclick="tab('train')">Train &amp; ship</button><button class="btn" onclick="tab('ml')">Model quality</button></div></div>`}).join('')+(packs.filter(x=>x.error).map(x=>`<div class="msg bad">${esc(x.file)}: unreadable (${esc(x.error)})</div>`).join('')):'No packs yet. Open Train &amp; ship to build one.';
+ // badges
+ const last=runs.filter(r=>r.exact!=null)[0];
+ $('badges').innerHTML=[`<span class="badge bg-green-lt">local only</span>`,`<span class="badge bg-secondary-lt">${ids.length} card type${ids.length===1?'':'s'}</span>`,`<span class="badge bg-secondary-lt">${ok.length} pack version${ok.length===1?'':'s'}</span>`,last?`<span class="badge bg-blue-lt">last run ${esc(last.name)} · ${f0(last.exact)} held-out</span>`:'<span class="badge bg-secondary-lt">no training run yet</span>'].join('');
+ // getting started, computed from real state
+ let best=null,detail=null;try{best=ok.sort((a,b)=>b.ship-a.ship||b.version-a.version)[0];detail=best&&details[best.file]}catch(e){}
+ const H=(detail&&detail.heldout)||{},minN=((detail&&detail.manifest.metrics.heldout&&detail.manifest.metrics.heldout.gate)||{}).min_n||20,gaps=detail?detail.fields.filter(f=>!H[f.key]||H[f.key].n<minN).length:null;
+ const imp=(lab.imported&&lab.imported.total)||0,steps=[
+  [lab.cells>0,'Label cells',`${lab.cells} cells on ${lab.pages} pages`,['Label',"tab('label')"]],
+  [runs.some(r=>r.state==='done'),'Train a reader',`${runs.length} run${runs.length===1?'':'s'}`,['Train & ship',"tab('train')"]],
+  [!!best&&best.ship>0,'Get a field to ship',best?`${best.ship} of ${best.fields} fields (${esc(best.id)} v${best.version})`:'no pack yet',['Train & ship',"tab('train')"]],
+  [gaps===0,'Give every field enough held-out cells',gaps==null?'':`${gaps} field${gaps===1?'':'s'} still under ${minN} cells`,['Label',"tab('label')"]],
+  [runs.filter(r=>r.state==='done').length>=2,'Compare two runs',`${runs.filter(r=>r.state==='done').length} finished run(s)`,['History',"tab('history')"]],
+  [tpls.length>0,'Save a card template',`${tpls.length} saved`,['Add one',"document.getElementById('drop2').scrollIntoView({behavior:'smooth'})"]],
+  [imp>0,'Import phone corrections',imp?`${imp} imported`:'none yet',['Label',"tab('label')"]]];
+ const done=steps.filter(x=>x[0]).length;$('chkn').textContent=`${done} of ${steps.length}`;$('chkb').style.width=(100*done/steps.length)+'%';
+ $('chk').innerHTML=steps.map(([d,t,sub,a])=>`<li class="${d?'done':''}"><i>${d?'&#10003;':''}</i><div><b>${esc(t)}</b><div class="tag">${sub}${d?'':` · <a onclick="${a[1]}">${a[0]} &rarr;</a>`}</div></div></li>`).join('');
+ // activity feed from real timestamps
+ const ev=[];runs.forEach(r=>ev.push({ts:r.ts,kind:'run',t:`Training run <b>${esc(r.name)}</b> ${esc(r.state)}`,sub:r.exact!=null?`${f0(r.exact)} held-out exact · ${r.shipped}/${r.fields} fields ship · ${r.n_cells} cells`:esc(r.detail||'')}));
+ ok.forEach(x=>{const t=Date.parse(x.created+'T00:00:00')/1000;if(t)ev.push({ts:t,kind:'pack',t:`Pack <b>${esc(x.id)} v${x.version}</b> created`,sub:`${x.ship} of ${x.fields} fields ship`})});
+ tpls.forEach(x=>{const t=Date.parse((x.created||'').replace(' ','T'))/1000;if(t)ev.push({ts:t,kind:'tpl',t:`Template <b>${esc(x.name)}</b> saved (v${x.latest})`,sub:`${x.fields} fields${x.grid?`, grid ${x.grid.rows}×${x.grid.cols}`:''}`})});
+ ev.sort((a,b)=>b.ts-a.ts);
+ $('feed').innerHTML=ev.length?ev.slice(0,8).map(e=>`<li class="${e.kind}">${e.t}<div class="tag">${e.sub} · ${when(e.ts)}</div></li>`).join(''):'<li class="tag">Nothing yet.</li>'}
+async function loadStatus(){const [t,l]=await Promise.all([api('/api/train/status'),api('/api/labels/summary')]);
+ const tr=t.state==='none'?'no training run yet':t.state==='done'&&t.results?`last run ${t.results.minutes} min · pooled held-out exact ${(t.results.cv_all.exact*100).toFixed(0)}% · pack ${esc(t.results.pack.id)} v${t.results.pack.version} ${t.results.pack.validation_errors.length?'INVALID':'valid'}`:`${t.state}: ${esc(t.detail||'')}`;
+ $('status').innerHTML=`<details class="st"><summary><b>Training:</b> ${tr}</summary><div class="tag" style="padding:6px 0">Details and the per-field gate table are in Train &amp; Ship. <a href="#train" onclick="tab('train')">Open</a></div></details>
+ <details class="st"><summary><b>Labels:</b> ${l.cells} cells on ${l.pages} pages${l.new?` · ${l.new} new this session`:''}</summary><div class="tag" style="padding:6px 0">Merged from labels.csv and labels_new.csv (new wins). <a href="#label" onclick="tab('label')">Open Label</a></div></details>`}
+async function loadLabel(){const l=await api('/api/labels/summary');$('lbody').innerHTML=`<p>${l.cells} labeled cells on ${l.pages} pages${l.new?` (${l.new} new)`:''}. The labeler shows crops the reader is least sure about and saves to <code>work/labels_new.csv</code>; existing labels are never modified.</p>
+ <div class="row"><a class="btn btn-primary" href="http://127.0.0.1:8766" target="_blank" rel="noopener" style="text-decoration:none">Open the labeler</a><a class="btn" href="http://127.0.0.1:8780" target="_blank" rel="noopener" style="text-decoration:none">Open Label Studio (optional)</a><span class="tag">If it does not open, start it with <code>python anc_label.py</code> in banglahandwriting/ (port 8766, this machine only).</span></div>
+ <h2 style="margin-top:16px">Import corrected labels</h2>
+ <div class="tool"><div><b>From the phone</b><div class="tag">A <code>corrections.zip</code> made by the app (corrected cells with their crop and the pack version). Pulled files only; nothing is fetched.</div></div><label class="btn" style="cursor:pointer">Choose zip<input type="file" accept=".zip" class="hide" onchange="importFile(this,'/api/import/corrections')"></label></div>
+ <div class="tool"><div><b>From Label Studio</b><div class="tag">Its JSON export. Only tasks named <code>field_c#_p-###.png</code> that match an existing crop are imported.</div></div><label class="btn" style="cursor:pointer">Choose JSON<input type="file" accept=".json" class="hide" onchange="importFile(this,'/api/import/label-studio')"></label></div>
+ <div id="imp" class="tag" style="margin-top:8px">${l.imported&&l.imported.total?`Imported so far: ${l.imported.total} labels (${l.imported.by_source.map(b=>`${b.labels} from ${b.source}${b.pack!=='-'?` on ${b.pack} v${b.pack_version}`:''}`).join(', ')}).`:'Nothing imported yet.'}</div>
+ <p class="tag">After labeling or importing, go to Train &amp; Ship: all labels are merged automatically (imported ones are newest-wins).</p>`}
+async function importFile(inp,url){const f=inp.files[0];inp.value='';if(!f)return;const o=$('imp');o.textContent='Importing…';
+ try{const r=await api(url,{method:'POST',body:f}),bad=(r.rejected||r.skipped||[]);
+  o.innerHTML=`<div class="${bad.length?'warn':'ok'}"><b>Imported ${r.imported}</b> (${r.new} new, ${r.changed} changed)${bad.length?` · ${bad.length} not imported`:''}</div>`+bad.slice(0,6).map(b=>`<div class="tag">${esc(b.reason)} ${b.line?`(line ${b.line})`:b.task!=null?`(task ${b.task})`:''}</div>`).join('');loadLabel()}catch(e){o.innerHTML=`<span class="bad">${esc(e.message)}</span>`}}
+function loadIdSum(){api('/api/idtest').then(d=>{const b=(d.headline||[]).find(x=>x.method==='baseline'),g=(d.headline||[]).find(x=>x.method.startsWith('geometry'));$('idsum').textContent=b?`Simulated phone photos, 223 images. Today's matcher: ${b.anc_ok[0]}/${b.anc_ok[1]} ANC accepted, ${b.other_as_anc[0]}/${b.other_as_anc[1]} non-ANC wrongly accepted. With outline check: ${g.other_as_anc[0]}/${g.other_as_anc[1]}.`:'Not run yet (python idtest.py build, score, report).'}).catch(()=>{$('idsum').textContent='unavailable'})}
+function loadStats(){loadDash();Promise.all([api('/api/packs'),api('/api/labels/summary'),api('/api/idtest'),api('/api/train/status')]).then(([p,l,i,t])=>{
+ const best=p.filter(x=>!x.error).sort((a,b)=>b.ship-a.ship||b.version-a.version)[0],hb=(i.headline||[]).find(x=>x.method==='baseline'),cv=t.state==='done'&&t.results?t.results.cv_all.exact:null;
+ const c=(k,v,sub,cls,go)=>`<div class="card stat${go?' link':''}" ${go?`onclick="${go}" tabindex="0" role="link" onkeydown="if(event.key==='Enter')${go}"`:''}><div class="subheader">${k}</div><div class="h1 ${cls||''}">${v}</div><div class="tag">${sub}</div></div>`;
+ $('stats').innerHTML=c('Card types',p.length,p.map(x=>esc(x.id)+' v'+x.version).join(', ')||'none yet','','document.getElementById(\'packs\').scrollIntoView({behavior:\'smooth\'})')+
+  c('Fields safe to ship',best?`${best.ship}<span class="tag" style="font-size:14px"> / ${best.fields}</span>`:'-',best?`${esc(best.id)} v${best.version}, target met on held-out pages`:'build a pack first',best&&best.ship?'text-green':'',"tab('train')")+
+  c('Labeled cells',l.cells+(l.imported&&l.imported.total?` <span class="tag" style="font-size:14px">+${l.imported.total}</span>`:''),`${l.pages} pages${l.imported&&l.imported.total?' · +imported':''}`,'',"tab('label')")+
+  c('Held-out exact match',cv==null?'-':(cv*100).toFixed(0)+'%',cv==null?'no run yet':'pooled 5-fold CV, by page','',"tab('history')")+
+  c('Template ID test',hb?`${hb.anc_ok[0]}/${hb.anc_ok[1]}`:'-',hb?`ANC accepted; ${hb.other_as_anc[0]}/${hb.other_as_anc[1]} non-ANC wrongly accepted (simulated photos)`:'not run','','window.open(\'/idtest\')')}).catch(()=>{})}
+function refreshCards(){loadStats();loadIdSum();loadPacks().catch(e=>{$('packs').innerHTML=`<div class="msg bad">${esc(e.message)}</div>`});loadTpls().catch(()=>{})}
+
+let PV=null;
+async function openPack(file){try{const d=await api(`/api/pack/${file}/detail`);PV={d,sel:null};
+ $('home').classList.add('hide');$('editor').classList.add('hide');$('pview').classList.remove('hide');
+ const m=d.manifest,ok=!d.errors.length,sh=d.fields.filter(f=>f.status==='ship').length;
+ $('pvtitle').textContent=`${m.id} v${m.version}`;$('pvsub').textContent=`${m.name} · saved ${m.created}`;
+ $('pvmsg').innerHTML=`<div class="msg ${ok?'':'bad'}">${ok?'Pack is valid (hashes, grid, fields and reader checked)':'Pack failed validation: '+d.errors.map(esc).join('; ')} · ${sh} of ${d.fields.length} fields ship</div>`;
+ const held=m.metrics.heldout;
+ $('pvinfo').innerHTML=`<div>Reader: ${m.reader.input.height}×${m.reader.input.width} → ${esc(m.reader.decode)}</div><div>Match floor: ${m.match.min_inliers} inliers (${esc(m.match.method)})</div><div>Photo clean-up default: ${esc((m.preprocess.normalize||{default:'flatten'}).default)}${m.preprocess.normalize&&m.preprocess.normalize.reference?` (reference mean ${m.preprocess.normalize.reference.mean}, std ${m.preprocess.normalize.reference.std})`:(m.preprocess.normalize?'':' (pack does not say: flatten)')}</div><div>Template: ${m.template.width}×${m.template.height}</div>
+  <div style="margin-top:6px">${held?`<b>Held-out evidence:</b> ${esc(held.method||'')}<br>${esc(held.reader_trained_on||'')}`:'<b>No held-out evidence.</b> Every field is needs-review.'}</div>
+  <div style="margin-top:6px" class="tag">File hashes:<br>${Object.entries(m.files).map(([k,v])=>`${esc(k)} ${v.slice(0,10)}…`).join('<br>')}</div>`;
+ const im=new Image();im.onload=()=>{PV.img=im;const cv=$('pvc');PV.scale=Math.min(1,1000/im.width);cv.width=im.width*PV.scale;cv.height=im.height*PV.scale;drawPack()};im.src=`/api/pack/${file}/template`;
+ pvTable()}catch(e){alert(e.message)}}
+function pvCells(){const g=PV.d.grid,gs=PV.d.manifest.template.grid_scale,nc=g.col_lines_top.length-1,out=[];
+ const xAt=(t,b,y)=>t+(b-t)*(y-g.y_ref_top)/(g.y_ref_bot-g.y_ref_top);
+ for(let c=0;c<nc;c++){const rl=g.row_lines_by_col[c];g.rows.forEach((key,ri)=>{const ym=(rl[ri]+rl[ri+1])/2,xa=xAt(g.col_lines_top[c],g.col_lines_bot[c],ym),xb=xAt(g.col_lines_top[c+1],g.col_lines_bot[c+1],ym);
+  out.push({key,c,x:xa/gs,y:rl[ri]/gs,w:(xb-xa)/gs,h:(rl[ri+1]-rl[ri])/gs})})}return out}
+function drawPack(){if(!PV||!PV.img)return;const cv=$('pvc'),c=cv.getContext('2d'),s=PV.scale;c.clearRect(0,0,cv.width,cv.height);c.drawImage(PV.img,0,0,cv.width,cv.height);
+ const st={};PV.d.fields.forEach(f=>st[f.key]=f.status);
+ pvCells().forEach(r=>{const ship=st[r.key]==='ship',sel=PV.sel===r.key;c.lineWidth=sel?3:1;c.strokeStyle=ship?'#157f3b':'#b54708';c.fillStyle=sel?(ship?'rgba(21,127,59,.28)':'rgba(181,71,8,.28)'):(ship?'rgba(21,127,59,.10)':'rgba(181,71,8,.07)');
+  c.fillRect(r.x*s,r.y*s,r.w*s,r.h*s);c.strokeRect(r.x*s,r.y*s,r.w*s,r.h*s)})}
+function pvTable(){const d=PV.d,pct=v=>(v*100).toFixed(0);
+ $('pvtable').innerHTML='<table class="table table-vcenter"><tr><th>Field</th><th>Kind</th><th>Rule</th><th>Min conf</th><th>Held-out</th><th>Decision</th></tr>'+d.fields.map(f=>{const h=d.heldout[f.key],rule=f.kind==='number'&&f.range?`${f.range[0]}–${f.range[1]}`:f.kind==='mark'?esc((f.valid_values||[]).join(' ')):f.kind==='bp'&&f.bp?`sys ${f.bp.sys.join('–')}, dia ${f.bp.dia.join('–')}${f.bp.sys_above_dia?', sys>dia':''}`:f.kind==='date'?'D/M/YY, real day and month':'-';
+  return `<tr style="cursor:pointer" onclick="PV.sel='${f.key}';drawPack()"><td>${esc(f.key)}</td><td>${f.kind}</td><td>${rule}</td><td>${f.min_confidence==null?'-':f.min_confidence}</td><td>${h?`${h.correct}/${h.n} (${pct(h.ci95[0])}–${pct(h.ci95[1])}%)`:'<span class="tag">none</span>'}</td><td><b class="${f.status==='ship'?'ok':'warn'}">${f.status==='ship'?'SHIP':'needs-review'}</b><div class="tag">${esc(f.status_reason)}</div></td></tr>`}).join('')+'</table>'}
+async function poll(){try{const t=await api('/api/training');const box=$('train');if(t.state==='none'){box.style.display='none';return}box.style.display='';
+ const pct=t.state==='done'?100:t.epoch?Math.min(100,Math.round(100*t.epoch/t.max_epochs)):0,eta=t.eta_sec_max?` · up to ${Math.ceil(t.eta_sec_max/60)} min left`:'';
+ const col=t.state==='done'?'ok':t.state==='running'?'warn':'bad';
+ let h=`<div class="row"><b class="${col}">${t.state.toUpperCase()}</b>${t.epoch?`<span class="tag">${t.state==='done'?`stopped at epoch ${t.epoch} of up to ${t.max_epochs} (early stop)`:`epoch ${t.epoch}/${t.max_epochs} (early stop may end sooner)`}${eta} · ${t.sec_per_epoch}s/epoch</span>`:''}</div>
+ <div style="height:10px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--acc)"></div></div>`;
+ if(t.epoch)h+=`<div class="tag" style="margin-top:6px">loss ${t.loss} · validation exact ${(t.val_exact*100).toFixed(1)}% · validation CER ${t.val_cer}</div>`;
+ if(t.results){const r=t.results,p=x=>x==null?'-':(x*100).toFixed(0)+'%';
+  h+=`<div class="tag" style="margin-top:10px">Held-out TEST: ${r.n_test} cells. Every field has n&lt;10: direction only, no per-field conclusion. CURRENT model column is training-writer data, not accuracy.</div>
+  <table class="table table-vcenter"><tr><th>Field</th><th>n</th><th>NEW held-out</th><th>95% CI</th><th>CER</th><th>CV pooled (n)</th><th>CURRENT (trained on)</th></tr>`+
+  r.fields.map(f=>`<tr><td>${f.field}</td><td>${f.n}</td><td>${p(f.exact)}</td><td>${p(f.lo)}–${p(f.hi)}</td><td>${f.cer.toFixed(2)}</td><td>${p(f.cv_exact)} (${f.cv_n??'-'})</td><td>${p(f.cur_exact)}</td></tr>`).join('')+'</table>'}
+ h+='<div class="charts" id="charts"></div>';$('tbody').innerHTML=h;renderCharts(t);if(t.state==='running')setTimeout(poll,3000);else if(t.state==='done')setTimeout(poll,30000)}catch(e){setTimeout(poll,10000)}}
+home();poll();renderArch();gatePoll();
+if(GH0.startsWith('#compare=')){const [a,b]=GH0.slice(9).split(',');setTimeout(async()=>{tab('history');await loadHistory();RUNSEL=[a,b];await loadHistory();cmpGo()},500)}
+if(GH0.startsWith('#ml=')){setTimeout(async()=>{tab('ml');await loadMLHome();mlPick(decodeURIComponent(GH0.slice(4)))},500)}
+if(GH0.startsWith('#grid=')){const [n,v]=GH0.slice(6).split('/');setTimeout(()=>gridOpen(n,+v),500)}
+
+function themeUI(){const m=themeGet('cs-mode','system'),a=themeGet('cs-accent','blue');
+ $('seg').innerHTML=[['system','System'],['light','Light'],['dark','Dark']].map(([k,n])=>`<button type="button" aria-pressed="${m===k}" onclick="themeSet('cs-mode','${k}');applyTheme();themeUI()">${n}</button>`).join('');
+ $('swatches').innerHTML=Object.entries(ACCENTS).map(([k,c])=>`<button type="button" title="${k}" aria-label="${k}" aria-pressed="${a===k}" style="background:${c}" onclick="themeSet('cs-accent','${k}');applyTheme();themeUI()"></button>`).join('')}
+
+const pct1=v=>v==null?'-':(v*100).toFixed(0)+'%',pp=v=>v==null?'-':(v>=0?'+':'')+(v*100).toFixed(0)+' pp';
+let RUNSEL=[];
+async function loadHistory(){const rs=await api('/api/runs');RUNSEL=RUNSEL.filter(n=>rs.some(r=>r.name===n));
+ $('runs').innerHTML=rs.length?`<table class="table table-vcenter"><tr><th></th><th>Run</th><th>Finished</th><th>Labels</th><th>Held-out exact [95%]</th><th>Shipped</th><th>Gate</th><th>State</th><th></th></tr>`+rs.map(r=>`<tr><td><input type="checkbox" ${RUNSEL.includes(r.name)?'checked':''} onchange="runTick('${r.name}',this.checked)" aria-label="select ${esc(r.name)}"></td><td><b>${esc(r.name)}</b>${r.pack?`<div class="tag">${esc(r.pack.id)} v${r.pack.version}</div>`:''}</td><td>${esc(r.when)}</td><td>${r.n_cells??'-'} cells<div class="tag">${r.n_pages??'-'} pages</div></td><td>${pct1(r.exact)} <span class="tag">[${pct1(r.lo)}-${pct1(r.hi)}]</span></td><td>${r.shipped}<span class="tag"> / ${r.fields}</span></td><td class="tag">${r.target??'-'}% · min ${r.min_n??'-'}</td><td><span class="badge ${r.state==='done'?'bg-green-lt':r.state==='error'?'bg-red-lt':'bg-secondary-lt'}">${esc(r.state)}</span></td><td><button class="btn" onclick="runDetail('${r.name}')">Details</button></td></tr>`).join('')+'</table>':'No runs yet. Open Train &amp; ship to start one.';
+ cmpHint()}
+function runTick(n,on){RUNSEL=RUNSEL.filter(x=>x!==n);if(on)RUNSEL.push(n);if(RUNSEL.length>2)RUNSEL.shift();loadHistory()}
+function cmpHint(){$('cmpbtn').disabled=RUNSEL.length!==2;$('cmphint').textContent=RUNSEL.length===2?`a = ${RUNSEL[0]}, b = ${RUNSEL[1]} (b minus a)`:RUNSEL.length===1?'Tick one more run.':'Tick two runs.'}
+async function cmpGo(){const o=$('cmp');o.innerHTML='<div class="msg">Comparing…</div>';
+ try{const c=await api(`/api/runs/compare?a=${encodeURIComponent(RUNSEL[0])}&b=${encodeURIComponent(RUNSEL[1])}`),V={better:'bg-green-lt',worse:'bg-red-lt',indistinguishable:'bg-secondary-lt'},ov=c.overall;
+  const bar=f=>f?`<div style="position:relative;height:8px;width:90px;background:var(--line);border-radius:4px"><div style="position:absolute;left:${f.lo*100}%;width:${(f.hi-f.lo)*100}%;height:8px;background:var(--s1);opacity:.6;border-radius:4px"></div><div style="position:absolute;left:${f.exact*100}%;top:-1px;width:3px;height:10px;background:var(--ink)"></div></div>`:'';
+  const cell=f=>f?`${f.k}/${f.n} · ${pct1(f.exact)}<div class="tag">${pct1(f.lo)}-${pct1(f.hi)}</div>${bar(f)}`:'<span class="tag">-</span>';
+  o.innerHTML=`<div class="card"><h2>${esc(c.a)} &rarr; ${esc(c.b)}</h2>
+   <div class="stats" style="margin-bottom:10px"><div class="card stat"><div class="subheader">Overall held-out exact</div><div class="h1">${pct1(ov.b.exact)}</div><div class="tag">was ${pct1(ov.a.exact)} · ${pp(ov.delta)} · <span class="badge ${V[ov.verdict]}">${ov.verdict}</span></div></div>
+    <div class="card stat"><div class="subheader">Fields shipped</div><div class="h1">${c.shipped.b}</div><div class="tag">was ${c.shipped.a}</div></div></div>
+   <ul class="tag" style="padding-left:18px">${c.caveats.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+   <table class="table table-vcenter"><tr><th>Field</th><th>${esc(c.a)}</th><th>${esc(c.b)}</th><th>Change</th><th>Gate</th></tr>`+c.rows.map(r=>`<tr><td>${esc(r.field)}</td><td>${cell(r.a)}</td><td>${cell(r.b)}</td><td>${r.delta==null?`<span class="badge bg-secondary-lt">${esc(r.verdict)}</span>`:`${pp(r.delta)} <span class="badge ${V[r.verdict]}">${r.verdict}</span>`}</td><td>${r.status_change?`<span class="badge bg-blue-lt">${esc(r.status_change)}</span>`:`<span class="tag">${r.b?esc(r.b.status):esc(r.a.status)}</span>`}</td></tr>`).join('')+'</table></div>';
+  pairedShow(RUNSEL[0],RUNSEL[1]);o.scrollIntoView({behavior:'smooth',block:'start'})}catch(e){o.innerHTML=`<div class="msg bad">${esc(e.message)}</div>`}}
+async function runDetail(n){const rs=await api('/api/runs'),r=rs.find(x=>x.name===n);if(!r)return;const dl=(w,l,ok)=>ok?`<a class="btn" href="/api/run/${n}/download/${w}" download>${l}</a>`:`<button class="btn" disabled>${l}</button>`;
+ $('rdetail').innerHTML=`<div class="card"><h2>${esc(n)}</h2><div class="tag">${esc(r.when)} · ${r.minutes??'-'} min · config ${esc(r.config||'-')} · ${esc(r.detail||'')}</div>
+  <div class="row" style="margin-top:10px">${dl('predictions.csv','Predictions (CSV)',r.has_predictions)}${dl('reader.onnx','Reader (ONNX)',r.has_reader)}${dl('results.json','Results (JSON)',r.state==='done')}${r.pack?`<a class="btn" href="/api/pack/${r.pack.id}_v${r.pack.version}.cardpack/download" download>Pack ${esc(r.pack.id)} v${r.pack.version}</a>`:''}</div>
+  <div class="tag">The predictions CSV holds patient values (label and read for each held-out cell). Treat downloads as patient data.</div>
+  <details style="margin-top:10px" ontoggle="if(this.open)runLog('${n}')"><summary>Training log</summary><div id="rlog" class="tag" style="padding-top:6px">loading…</div></details></div>`;$('rdetail').scrollIntoView({behavior:'smooth',block:'start'})}
+async function runLog(n){const o=$('rlog'),l=await api(`/api/run/${n}/log`);o.innerHTML=l.found?`${l.cut?`<div class="tag">Showing the last ${l.text.length} of ${l.bytes} bytes. <a href="/api/run/${n}/download/log.txt" download>Download all</a></div>`:`<a href="/api/run/${n}/download/log.txt" download>Download</a>`}<pre style="max-height:360px;overflow:auto;margin-top:6px;font-size:11px">${esc(l.text)}</pre>`:'This run has no log file.'}
+
+let LABBOUND=false;
+async function labInit(){try{const p=await api('/api/cleanup/packs'),sel=$('lpack'),cur=sel.value;sel.innerHTML='<option value="auto">Best match (newest on ties)</option>'+p.map(x=>`<option value="${esc(x.file)}">${esc(x.name)} · default: ${esc(x.default)}${x.has_reference?'':' · no contrast reference'}</option>`).join('');sel.value=[...sel.options].some(o=>o.value===cur)?cur:'auto'}catch(e){}
+ if(!LABBOUND){LABBOUND=true;const z=$('ldrop');['dragover','dragenter'].forEach(e=>z.addEventListener(e,x=>{x.preventDefault();z.classList.add('over')}));['dragleave','drop'].forEach(e=>z.addEventListener(e,x=>{x.preventDefault();z.classList.remove('over')}));z.addEventListener('drop',e=>labRun(e.dataTransfer.files[0]));$('lfile').onchange=e=>{labRun(e.target.files[0]);e.target.value=''}}}
+async function labRun(f){if(!f)return;const o=$('lres');o.innerHTML='<div class="msg">Aligning and reading with every option…</div>';
+ try{const r=await api('/api/cleanup?pack='+encodeURIComponent($('lpack').value),{method:'POST',body:f});labShow(r)}catch(e){o.innerHTML=`<div class="msg bad">${esc(e.message)}</div>`}}
+function labShow(r){const ok=r.methods.filter(m=>m.available),name=m=>m.label;
+ const cards=r.methods.map(m=>m.available?`<div class="card" style="margin:0"><a href="${m.image}" target="_blank" rel="noopener"><img src="${m.image}" alt="${esc(m.label)}" style="width:100%;border:1px solid var(--line);border-radius:6px"></a>
+   <div style="margin-top:8px"><b>${esc(m.label)}</b> ${m.is_pack_default?'<span class="badge bg-blue-lt">pack default</span>':''}</div>
+   <div class="tag">${m.read} cells read of ${m.with_ink} with ink · <span class="${m.flagged?'warn':''}">${m.flagged} flagged</span> · mean confidence ${m.mean_confidence??'-'}</div></div>`
+   :`<div class="card" style="margin:0"><b>${esc(m.label)}</b><div class="tag" style="margin-top:6px">Not available: ${esc(m.note)}</div></div>`).join('');
+ const rows=r.disagreements.slice(0,80).map(d=>`<tr><td>${esc(d.field)}</td><td>${d.visit}</td>`+ok.map(m=>{const x=d.reads[m.method];return `<td class="${x.flagged?'warn':''}">${x.text?esc(x.text):'<span class="tag">(blank)</span>'}<div class="tag">${x.confidence}</div></td>`}).join('')+'</tr>').join('');
+ $('lres').innerHTML=`<div class="card"><h2>${esc(r.pack)} · ${r.inliers} inliers · photo covers ${r.covered_percent}% of the card</h2>
+  <div class="tag">Pack default clean-up: ${esc(r.pack_default)}. Amber = flagged for review (confidence below the field's minimum).</div>
+  <div class="charts" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">${cards}</div></div>
+  <div class="card"><h2>Cells where the options disagree (${r.disagreements.length} of ${r.cells_total})</h2>
+  ${r.disagreements.length?`<table class="table table-vcenter"><tr><th>Field</th><th>Visit</th>${ok.map(m=>`<th>${esc(m.label)}</th>`).join('')}</tr>${rows}</table>${r.disagreements.length>80?'<div class="tag">First 80 shown.</div>':''}`:'<div class="tag">Every option read every cell the same.</div>'}
+  <ul class="tag" style="padding-left:18px;margin-top:10px">${r.notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul></div>`}
+
+async function loadDash(){try{const [p,l,runs]=await Promise.all([api('/api/packs'),api('/api/labels/summary'),api('/api/runs')]);
+ const best=p.filter(x=>!x.error).sort((a,b)=>b.ship-a.ship||b.version-a.version)[0];if(!best){$('attn').innerHTML='<li class="tag">No packs yet.</li>';$('rd').innerHTML='';return}
+ const d=await api('/api/pack/'+encodeURIComponent(best.file)+'/detail');renderReadiness(d,best);renderAttention(d,best,l,runs);renderTrend(runs)}catch(e){$('attn').innerHTML=`<li class="bad">${esc(e.message)}</li>`}}
+function renderReadiness(d,best){const g=d.manifest.metrics.heldout&&d.manifest.metrics.heldout.gate,target=g?g.target_lower_bound_pct/100:0.85,H=d.heldout||{};
+ $('rdsub').textContent=`${best.id} v${best.version} · held-out, 95% intervals · dashed line = ship target ${(target*100).toFixed(0)}%`;
+ const rows=d.fields.map(f=>({f,h:H[f.key]})).sort((a,b)=>(b.f.status==='ship')-(a.f.status==='ship')||((b.h&&b.h.n)||0)-((a.h&&a.h.n)||0));
+ $('rd').innerHTML=rows.map(({f,h})=>{const badge=f.status==='ship'?'<span class="badge bg-green-lt">ship</span>':'<span class="badge bg-orange-lt">needs-review</span>';
+  if(!h)return `<div class="nm" title="${esc(f.key)}">${esc(f.key)}</div><div class="tag">no labeled cells yet</div><div class="nn">-</div>${badge}`;
+  const ex=h.correct/h.n,[lo,hi]=h.ci95;return `<div class="nm" title="${esc(f.status_reason||'')}">${esc(f.key)}</div><div class="bar" title="${h.correct}/${h.n} correct, 95% interval ${(lo*100).toFixed(0)}-${(hi*100).toFixed(0)}%"><i style="left:${lo*100}%;width:${(hi-lo)*100}%"></i><u style="left:${ex*100}%"></u><s style="left:${target*100}%"></s></div><div class="nn">${h.correct}/${h.n}</div>${badge}`}).join('')}
+function renderAttention(d,best,l,runs){const g=d.manifest.metrics.heldout&&d.manifest.metrics.heldout.gate,minN=g?g.min_n:20,target=g?g.target_lower_bound_pct/100:0.85,H=d.heldout||{},items=[];
+ const none=d.fields.filter(f=>!H[f.key]).map(f=>f.key),few=d.fields.filter(f=>H[f.key]&&H[f.key].n<minN&&H[f.key].ci95[1]<target),stuck=d.fields.filter(f=>H[f.key]&&H[f.key].n>=minN&&H[f.key].ci95[1]<target);
+ if(stuck.length)items.push(['warn',`${stuck.length} field${stuck.length>1?'s are':' is'} credibly below the target`,`${stuck.map(f=>`${esc(f.key)} (${H[f.key].correct}/${H[f.key].n})`).join(', ')}: with ${minN}+ held-out cells, the whole 95% interval is under ${(target*100).toFixed(0)}%.${stuck.some(f=>H[f.key].correct/H[f.key].n<0.1)?' A near-zero score usually means the crops or labels are wrong for that field, so check those before labeling more.':' More training labels may help, but check the crops and the reader too.'}`,null]);
+ const needLabels=d.fields.filter(f=>H[f.key]&&H[f.key].n<minN&&f.status!=='ship');
+ if(needLabels.length)items.push(['warn',`${needLabels.length} field${needLabels.length>1?'s':''} have fewer than ${minN} held-out cells`,`${needLabels.slice(0,6).map(f=>`${esc(f.key)} (${H[f.key].n})`).join(', ')}${needLabels.length>6?', …':''}. They cannot ship until there are enough cells to judge.`,['Label cells',"tab('label')"]]);
+ if(none.length)items.push(['info',`${none.length} field${none.length>1?'s have':' has'} no labeled cells`,esc(none.join(', ')),['Label cells',"tab('label')"]]);
+ const last=runs[0],total=l.cells+((l.imported&&l.imported.total)||0);
+ if(last&&last.n_cells!=null&&total>last.n_cells)items.push(['info',`${total-last.n_cells} labels added since the last training run`,`Run ${esc(last.name)} used ${last.n_cells} cells; there are ${total} now.`,['Train & ship',"tab('train')"]]);
+ if(!last)items.push(['info','No training run yet','Build the first pack from the labeled cells.',['Train & ship',"tab('train')"]]);
+ if(!(d.manifest.preprocess&&d.manifest.preprocess.normalize&&d.manifest.preprocess.normalize.reference))items.push(['info',`${esc(best.id)} v${best.version} has no photo-contrast reference`,'Photos in poor light read best with the contrast-matching clean-up, which needs a pack that carries one.',null]);
+ if(!items.length)items.push(['ok','Nothing needs attention','Every field with labels meets the target.',null]);
+ $('attn').innerHTML=items.map(([sev,t,b,a])=>`<li><span class="dot ${sev}"></span><div><b>${t}</b><span class="tag">${b}</span>${a?` <a onclick="${a[1]}">${a[0]} &rarr;</a>`:''}</div></li>`).join('')}
+function renderTrend(runs){const done=runs.filter(r=>r.exact!=null).sort((a,b)=>a.ts-b.ts);
+ if(done.length<2){$('trend').innerHTML=`<div class="tag" style="margin-top:12px">${done.length?'One training run so far':'No finished run yet'}: a trend appears once there are two. <a style="cursor:pointer;text-decoration:underline" onclick="tab('history')">History</a> compares runs.</div>`;return}
+ const W=620,H=140,L=40,R=12,T=14,B=26,X=i=>L+(W-L-R)*(done.length===1?.5:i/(done.length-1)),Y=v=>T+(H-T-B)*(1-v);let g='';
+ for(const v of [0,.25,.5,.75,1])g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${L-5}" y="${Y(v)+4}" text-anchor="end">${v*100}%</text>`;
+ g+=`<polyline fill="none" stroke="var(--s1)" stroke-width="2" points="${done.map((r,i)=>`${X(i)},${Y(r.exact)}`).join(' ')}"/>`;
+ done.forEach((r,i)=>{g+=`<line x1="${X(i)}" x2="${X(i)}" y1="${Y(r.lo)}" y2="${Y(r.hi)}" stroke="var(--s1)" stroke-width="2" opacity=".5"/><circle cx="${X(i)}" cy="${Y(r.exact)}" r="4.5" fill="var(--s1)" stroke="var(--card)" stroke-width="2"><title>${esc(r.name)}: ${(r.exact*100).toFixed(0)}% [${(r.lo*100).toFixed(0)}-${(r.hi*100).toFixed(0)}], ${r.shipped}/${r.fields} shipped, ${r.n_cells} cells</title></circle>`;if(done.length<=8)g+=`<text x="${X(i)}" y="${H-8}" text-anchor="middle">${esc(r.name.replace(/^run-?/,'#'))}</text>`});
+ $('trend').innerHTML=`<div class="tag" style="margin-top:14px"><b>Held-out exact match by run</b> (pooled CV, 95% interval)</div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Held-out exact match by training run">${g}</svg>`}
+
+const f2=v=>v==null?'-':(v*100).toFixed(1)+'%',f0=v=>v==null?'-':(v*100).toFixed(0)+'%';
+let MLX={o:null,sel:null};
+async function loadMLHome(){try{const o=await api('/api/ml/overview');MLX.o=o;
+  const keys=[...o.card_types.map(c=>'ct:'+c.id),...o.templates.map(t=>'tpl:'+t.name)];
+  if(!keys.includes(MLX.sel))MLX.sel=(o.card_types.find(c=>c.runs.length)?'ct:'+o.card_types.find(c=>c.runs.length).id:keys[0]);
+  mlNav();mlPick(MLX.sel,true)}catch(e){$('mlnav').innerHTML=`<div class="msg bad">${esc(e.message)}</div>`}}
+function mlNav(){const o=MLX.o;$('mlnav').innerHTML=o.card_types.map(c=>{const last=c.runs[c.runs.length-1];return `<button class="mlitem ${MLX.sel==='ct:'+c.id?'on':''}" onclick="mlPick('ct:${esc(c.id)}')"><span class="kind">card type · pack</span><b>${esc(c.name)}</b><span class="tag">${c.runs.length} run${c.runs.length===1?'':'s'}${last?` · latest ${f0(last.exact)} held-out`:' · no run yet'} · ${c.versions.length} version${c.versions.length===1?'':'s'}</span></button>`}).join('')
+  +o.templates.map(t=>`<button class="mlitem ${MLX.sel==='tpl:'+t.name?'on':''}" onclick="mlPick('tpl:${esc(t.name)}')"><span class="kind">template · layout only</span><b>${esc(t.name)}</b><span class="tag">v${t.latest} · ${t.fields} fields · ${t.linked_pack?'linked to pack '+esc(t.linked_pack):'no reader trained'}</span></button>`).join('')}
+function mlPick(key,quiet){MLX.sel=key;mlNav();const o=MLX.o,box=$('mlruns');$('mlbody').innerHTML='';$('mlheadcard').style.display='none';
+ if(key.startsWith('tpl:')){const t=o.templates.find(x=>'tpl:'+x.name===key);if(!t)return;const st=t.stages,chip=(ok,l)=>`<span class="${ok?'ok':''}">${ok?'&#10003; ':''}${l}</span>`;
+  box.innerHTML=`<div class="card"><h2>${esc(t.name)} <span class="tag">template v${t.latest}</span></h2><div class="stg">${chip(st.layout,'Layout saved')}${chip(st.grid,'Reader grid saved')}${chip(st.labels>0,'Labeled cells: '+st.labels)}${chip(st.run,'Training run')}${chip(st.pack,'Pack')}</div>
+   <div class="tag">No model quality exists for this template: it has a layout${st.grid?' and a reader grid':''} but no labeled cells, no training run and no pack, so there is nothing held-out to measure. The trainer today reads ANC-style tables only, so training for a new card type is the next piece of work, not a button here.</div>
+   <div class="row"><button class="btn" onclick="tab('cards');setTimeout(()=>document.getElementById('tpls').scrollIntoView({behavior:'smooth'}),200)">Open the template</button></div></div>`;return}
+ const c=o.card_types.find(x=>'ct:'+x.id===key);if(!c)return;
+ if(!c.runs.length){box.innerHTML=`<div class="card"><h2>${esc(c.name)}</h2><div class="tag">No finished training run for this card type yet.</div></div>`;return}
+ const best=(f,hi)=>{const v=c.runs.map(f);return hi?Math.max(...v):Math.min(...v)},mark=(v,b,hi)=>c.runs.length>1&&Math.abs(v-b)<1e-12?' <span class="badge bg-green-lt">best</span>':'';
+ const bx=best(r=>r.exact,true),bc=best(r=>r.cer,false),be=best(r=>r.ece,false),bs=best(r=>r.silent_error_rate,false);
+ box.innerHTML=`<div class="card"><h2>${esc(c.name)} <span class="tag">${c.runs.length} run${c.runs.length===1?'':'s'}, held-out (pooled 5-fold CV by page)</span></h2>
+  <table class="table table-vcenter"><tr><th>Run</th><th>Finished</th><th>Labels</th><th>Exact [95%]</th><th>Char error</th><th>Calibration (ECE)</th><th>Silent errors*</th><th>Auto-accepted*</th><th>Shipped</th><th></th></tr>`+c.runs.map(r=>`<tr><td><b>${esc(r.name)}</b><div class="tag">${esc(r.pack)} · ${esc(r.config||'')}</div></td><td>${esc(r.when)}</td><td>${r.n_cells}<div class="tag">${r.n_pages??'-'} pages</div></td>
+   <td>${f0(r.exact)}${mark(r.exact,bx,true)}<div class="tag">[${f0(r.lo)}–${f0(r.hi)}]</div></td><td>${(r.cer*100).toFixed(1)}%${mark(r.cer,bc)}</td><td>${(r.ece*100).toFixed(1)} pts${mark(r.ece,be)}</td><td class="${r.silent_error_rate>0.05?'warn':''}">${f2(r.silent_error_rate)}${mark(r.silent_error_rate,bs)}</td><td>${f0(r.coverage)}<div class="tag">${f0(r.policy_accuracy)} right</div></td><td>${r.shipped}/${r.fields}</td><td><button class="btn" onclick="mlOpen('${esc(r.name)}')">Full evaluation</button></td></tr>`).join('')+`</table>
+  <div class="tag">* under the app's per-field flag rule: cells accepted without review that were wrong, as a share of all cells; and the share accepted, with their accuracy. ${c.runs.length>1?'Intervals are optimistic (cells on a page are correlated), so treat small differences between runs as noise. <a style="cursor:pointer;text-decoration:underline" onclick="tab(\'history\')">History</a> compares runs field by field.':'One run so far: a second run makes this a comparison.'}</div>${c.runs.length>1?mlTrend(c.runs):''}</div>`;
+ if(!quiet||true)mlOpen(c.runs[c.runs.length-1].name,true)}
+async function mlOpen(run,noscroll){try{const sel=MLX.sel,r=await api('/api/ml?run='+encodeURIComponent(run));if(MLX.sel!==sel)return;$('mlheadcard').style.display='';$('mlhead').textContent='Full evaluation: '+run;mlShow(r);if(!noscroll)$('mlheadcard').scrollIntoView({behavior:'smooth',block:'start'})}catch(e){$('mlbody').innerHTML=`<div class="msg bad">${esc(e.message)}</div>`}}
+function mlTrend(runs){const W=620,H=130,L=40,R=12,T=12,B=24,X=i=>L+(W-L-R)*(runs.length===1?.5:i/(runs.length-1)),Y=v=>T+(H-T-B)*(1-v);let g='';
+ for(const v of [0,.5,1])g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${L-5}" y="${Y(v)+4}" text-anchor="end">${v*100}%</text>`;
+ g+=`<polyline fill="none" stroke="var(--s1)" stroke-width="2" points="${runs.map((r,i)=>`${X(i)},${Y(r.exact)}`).join(' ')}"/>`+runs.map((r,i)=>`<line x1="${X(i)}" x2="${X(i)}" y1="${Y(r.lo)}" y2="${Y(r.hi)}" stroke="var(--s1)" stroke-width="2" opacity=".5"/><circle cx="${X(i)}" cy="${Y(r.exact)}" r="4.5" fill="var(--s1)" stroke="var(--card)" stroke-width="2"><title>${esc(r.name)}: ${f0(r.exact)}</title></circle><text x="${X(i)}" y="${H-6}" text-anchor="middle">${esc(r.name)}</text>`).join('');
+ return `<div class="trend" style="margin-top:12px"><div class="tag"><b>Held-out exact match by run</b></div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Held-out exact match by run">${g}</svg></div>`}
+function mlShow(r){const o=r.overall,pol=r.risk_coverage.policy,m=r.model||{},cal=r.calibration;
+ $('mlsub').textContent=`${r.pack} · ${r.config} · ${r.minutes} min · ${r.data.cells} cells, ${r.data.pages} pages`;
+ const k=(a,b,c,cls)=>`<div class="card"><div class="subheader">${a}</div><div class="h1 ${cls||''}">${b}</div><div class="tag">${c}</div></div>`;
+ const kp=`<div class="kpis">${k('Exact match',f0(o.exact),`95% [${f0(o.lo)}–${f0(o.hi)}] · ${o.n} cells`)}${k('Character error rate',(o.cer*100).toFixed(1)+'%',`${o.sub} sub · ${o.ins} ins · ${o.del} del`)}
+  ${k('Calibration (ECE)',(cal.ece*100).toFixed(1)+' pts',`${cal.read} reads, ${cal.no_read} blank reads`)}
+  ${k('At the shipped flag rule','',`${f0(pol.coverage)} auto-accepted at ${f0(pol.accuracy)} accuracy`).replace('<div class="h1 "></div>',`<div class="h1 ${pol.silent_error_rate>0.05?'warn':''}">${f2(pol.silent_error_rate)}</div>`)}
+  ${k('Model',m.params?(m.params/1000).toFixed(0)+'k params':(m.onnx_bytes?(m.onnx_bytes/1048576).toFixed(1)+' MB':'-'),m.onnx_bytes?`${(m.onnx_bytes/1048576).toFixed(1)} MB ONNX · ${m.input?m.input.join('×'):''}`:'')}
+  ${k('CPU latency',m.latency_ms_median!=null?m.latency_ms_median+' ms':'-',m.latency_ms_p95!=null?`median per cell · p95 ${m.latency_ms_p95} ms (this Mac)`:'')}</div>`;
+ const maxn=Math.max(...r.fields.map(f=>f.n));
+ const ftab=`<table class="table table-vcenter"><tr><th>Field</th><th>n</th><th>Exact [95%]</th><th>CER</th><th>Errors (sub / ins / del)</th><th>Mean conf.</th><th>Flagged</th><th>Blank reads</th></tr>`+r.fields.map(f=>{const tot=f.sub+f.ins+f.del||1;
+  return `<tr><td>${esc(f.field)}</td><td>${f.n}</td><td><div class="tag">${f0(f.exact)} [${f0(f.lo)}–${f0(f.hi)}]</div><div style="position:relative;height:8px;width:110px;background:var(--line);border-radius:4px"><div style="position:absolute;left:${f.lo*100}%;width:${(f.hi-f.lo)*100}%;height:8px;background:var(--s1);opacity:.55;border-radius:4px"></div><div style="position:absolute;left:${f.exact*100}%;top:-1px;width:3px;height:10px;background:var(--ink)"></div></div></td><td>${f.cer.toFixed(2)}</td>
+  <td>${f.sub+f.ins+f.del?`<div class="bar2" style="width:110px" title="${f.sub} substitutions, ${f.ins} insertions, ${f.del} deletions"><i style="width:${f.sub/tot*100}%;background:var(--s1)"></i><i style="width:${f.ins/tot*100}%;background:var(--s2)"></i><i style="width:${f.del/tot*100}%;background:var(--s3)"></i></div><div class="tag">${f.sub} / ${f.ins} / ${f.del}</div>`:'<span class="tag">none</span>'}</td><td>${f.mean_conf==null?'-':f.mean_conf.toFixed(2)}</td><td>${f.flagged}</td><td class="${f.no_read?'warn':''}">${f.no_read}</td></tr>`}).join('')+'</table>';
+ $('mlbody').innerHTML=kp+`<div class="card"><h2>Per field, held-out</h2>${ftab}<div class="tag"><span style="color:var(--s1)">&#9632;</span> substitution <span style="color:var(--s2)">&#9632;</span> insertion <span style="color:var(--s3)">&#9632;</span> deletion (a deleted character or a whole blank read). "Blank reads" are cells with a label where the model emitted nothing: the app never flags a blank, so these are silent.</div></div>
+  <div class="mlg">${mlCalib(cal)}${mlRisk(r.risk_coverage)}</div>
+  <div class="mlg">${mlConf(r.confusions)}${mlData(r.data,r.fields)}</div><div class="tag" style="margin:8px 0 24px">${esc(r.caveat)}</div>`;mlExtras(r.run)}
+function mlCalib(c,title){title=title||'Calibration';const W=360,H=250,L=40,R=10,T=14,B=34,X=v=>L+(W-L-R)*v,Y=v=>T+(H-T-B)*(1-v);let g='';
+ for(const v of [0,.25,.5,.75,1])g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${L-5}" y="${Y(v)+4}" text-anchor="end">${v*100}</text><text x="${X(v)}" y="${H-18}" text-anchor="middle">${v*100}</text>`;
+ g+=`<line x1="${X(0)}" y1="${Y(0)}" x2="${X(1)}" y2="${Y(1)}" stroke="var(--mut)" stroke-dasharray="4 3"/>`;
+ c.bins.forEach(b=>{if(!b.n)return;const bw=(W-L-R)/BINSN-3,x=X(b.lo)+1.5,h=(H-T-B)*b.acc;g+=`<rect x="${x}" y="${Y(b.acc)}" width="${bw}" height="${h}" rx="3" fill="var(--s1)" opacity=".75"><title>confidence ${(b.lo*100).toFixed(0)}–${(b.hi*100).toFixed(0)}%: ${(b.acc*100).toFixed(0)}% correct (n=${b.n})</title></rect><text x="${x+bw/2}" y="${Y(b.acc)-4}" text-anchor="middle">${b.n}</text>`});
+ g+=`<text x="${(L+W-R)/2}" y="${H-3}" text-anchor="middle">confidence (lowest per-character probability), %</text>`;
+ return `<div class="card"><h2>${title}</h2><div class="tag">Bars should follow the dashed diagonal: a read at 80% confidence should be right about 80% of the time. Numbers above bars are cells. ECE ${(c.ece*100).toFixed(1)} points.</div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Reliability diagram">${g}</svg></div>`}
+const BINSN=10;
+function mlRisk(rc){const W=360,H=250,L=40,R=10,T=14,B=34,X=v=>L+(W-L-R)*v,pts=rc.curve.filter(c=>c.accuracy!=null),lo=Math.floor(Math.min(...pts.map(p=>p.accuracy),.9)*10)/10,Y=v=>T+(H-T-B)*(1-(v-lo)/(1-lo));let g='';
+ for(let v=lo;v<=1.0001;v+=(1-lo)>.5?.2:.1){g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${L-5}" y="${Y(v)+4}" text-anchor="end">${(v*100).toFixed(0)}</text>`}
+ for(const v of [0,.25,.5,.75,1])g+=`<text x="${X(v)}" y="${H-18}" text-anchor="middle">${v*100}</text>`;
+ g+=`<polyline fill="none" stroke="var(--s1)" stroke-width="2" points="${pts.map(p=>`${X(p.coverage)},${Y(p.accuracy)}`).join(' ')}"/>`+pts.map(p=>`<circle cx="${X(p.coverage)}" cy="${Y(p.accuracy)}" r="3" fill="var(--s1)"><title>accept confidence >= ${(p.t*100).toFixed(0)}%: coverage ${(p.coverage*100).toFixed(0)}%, accuracy ${(p.accuracy*100).toFixed(0)}%, silent errors ${(p.silent_error_rate*100).toFixed(1)}% of all cells</title></circle>`).join('');
+ const pol=rc.policy;if(pol.accuracy!=null)g+=`<circle cx="${X(pol.coverage)}" cy="${Y(pol.accuracy)}" r="6" fill="none" stroke="var(--s2)" stroke-width="2.5"><title>the shipped flag rule</title></circle><text x="${X(pol.coverage)-8}" y="${Y(pol.accuracy)-10}" text-anchor="end" style="fill:var(--s2)">shipped rule</text>`;
+ g+=`<text x="${(L+W-R)/2}" y="${H-3}" text-anchor="middle">coverage: share of cells accepted without review, %</text>`;
+ return `<div class="card"><h2>Risk &ndash; coverage</h2><div class="tag">Raise the confidence cutoff and fewer cells are auto-accepted, but those are right more often. The ring is where the app's per-field flag rule sits: ${f0(pol.coverage)} accepted at ${f0(pol.accuracy)} accuracy, ${pol.silent_errors} silent errors (${f2(pol.silent_error_rate)} of cells), ${pol.flagged_for_review} flagged, ${pol.blank_reads_of_filled_cells} blank reads of filled cells.</div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Accuracy against coverage">${g}</svg></div>`}
+function mlConf(c){const t=c.top_substitutions,mx=Math.max(1,...t.map(x=>x.n)),ch=c.matrix.chars,m=c.matrix.sub,mm=Math.max(1,...m.flat());
+ const list=t.length?t.map(x=>`<div style="display:grid;grid-template-columns:70px minmax(0,1fr) 28px;gap:8px;align-items:center;font-size:12px"><span><b>${esc(x.true)}</b> &rarr; <b>${esc(x.read)}</b></span><div style="height:8px;background:var(--line);border-radius:4px"><div style="height:8px;width:${x.n/mx*100}%;background:var(--s2);border-radius:4px"></div></div><span class="tag">${x.n}</span></div>`).join(''):'<div class="tag">No substitutions.</div>';
+ const heat=ch.length?`<div style="overflow:auto;margin-top:10px"><table class="heat"><tr><th></th>${ch.map(x=>`<th>${esc(x)}</th>`).join('')}</tr>${ch.map((a,i)=>`<tr><th>${esc(a)}</th>${ch.map((b,j)=>{const n=m[i][j];return `<td style="${n?`background:color-mix(in srgb,var(--s2) ${20+80*n/mm}%,transparent)`:''}" title="${esc(a)} read as ${esc(b)}: ${n}">${n||''}</td>`}).join('')}</tr>`).join('')}</table><div class="tag">rows: the true character, columns: what was read</div></div>`:'';
+ const ps=c.positions||null,pbar=(l,n,tot)=>`<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 40px;gap:8px;align-items:center;font-size:12px"><span>${l}</span><div style="height:8px;background:var(--line);border-radius:4px"><div style="height:8px;width:${tot?n/tot*100:0}%;background:var(--s1);border-radius:4px"></div></div><span class="tag">${n}</span></div>`,pos=ps&&ps.wrong?`<div class="tag" style="margin:12px 0 4px"><b>Where the first mistake falls</b> (${ps.wrong} wrong of ${ps.multi_cells} cells with 2+ characters)</div>${pbar('first character',ps.first,ps.wrong)}${pbar('middle',ps.middle,ps.wrong)}${pbar('last character',ps.last,ps.wrong)}<div class="tag">${ps.first_deleted} of the first-character mistakes are the character simply missing. ${ps.first/ps.wrong>0.5?'More than half start at the first character: look at the left edge of the crop and the model input before anything else.':''}</div>`:'';
+ return `<div class="card"><h2>Confusions</h2><div class="tag">Substitutions ${c.totals.sub}, insertions ${c.totals.ins}, deletions ${c.totals.del}. Most deleted: ${c.most_deleted.map(x=>esc(x.char)+' ('+x.n+')').join(', ')||'-'}. Most inserted: ${c.most_inserted.map(x=>esc(x.char)+' ('+x.n+')').join(', ')||'-'}.</div><div style="display:grid;gap:5px;margin-top:8px">${list}</div>${pos}${heat}</div>`}
+function mlData(d,fields){const mx=Math.max(...d.chars.map(x=>x.n));
+ return `<div class="card"><h2>Data</h2><div class="tag">${d.cells} labeled cells on ${d.pages} pages · mean label length ${d.mean_len.toFixed(1)} · ${fields.length} fields with labels</div>
+  <div class="tag" style="margin:10px 0 4px"><b>Characters in the labels</b> (rare ones are where the reader is least trained)</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:4px 14px">${d.chars.map(x=>`<div style="display:grid;grid-template-columns:22px minmax(0,1fr) 34px;gap:6px;align-items:center;font-size:12px"><b>${esc(x.char)}</b><div style="height:7px;background:var(--line);border-radius:4px"><div style="height:7px;width:${x.n/mx*100}%;background:var(--s1);border-radius:4px"></div></div><span class="tag">${x.n}</span></div>`).join('')}</div></div>`}
+
+const enc=encodeURIComponent;
+function mlExtras(run){const b=document.createElement('div');b.id='mlextra';$('mlbody').appendChild(b);
+ b.innerHTML=`<div class="card" id="fb"><h2>Failure browser <span class="tag">the actual crops, with what the reader said</span></h2><div class="row"><label>Show <select id="fbkind" onchange="fbLoad('${esc(run)}')"></select></label><label>Field <select id="fbfield" onchange="fbLoad('${esc(run)}',true)"><option value="">all fields</option></select></label><span class="tag" id="fbn"></span></div><div class="fbgrid" id="fbgrid"><div class="tag">loading…</div></div></div>
+  <div class="card" id="tuner"><h2>Flag policy and recalibration <span class="tag">what each cutoff costs, on held-out cells</span></h2><div id="tunerbody" class="tag">loading…</div></div>
+  <div id="recal" class="mlg"></div><div id="curves"></div><div class="card" id="prov"><h2>Provenance <span class="tag">can this run be reproduced?</span></h2><div id="provbody" class="tag">loading…</div></div>`;
+ if(document.documentElement.classList.contains('shots'))$('fbgrid').innerHTML='<div class="tag">Hidden in screenshot mode: this section shows patient handwriting.</div>';else fbLoad(run,false,'silent');tunerInit(run);curvesInit(run);provInit(run)}
+async function fbLoad(run,keepField,firstKind){const ks=$('fbkind'),fs=$('fbfield');if(firstKind&&!ks.options.length)ks.dataset.pending=firstKind;
+ const kind=ks.value||firstKind||'silent',field=keepField?fs.value:'';
+ try{const d=await api(`/api/errors?run=${enc(run)}&kind=${kind}${field?`&field=${enc(field)}`:''}&limit=120`);
+  if(!ks.options.length){ks.innerHTML=Object.entries(d.kinds).map(([k,v])=>`<option value="${k}">${esc(v)}</option>`).join('');ks.value=kind}
+  if(!keepField){fs.innerHTML='<option value="">all fields</option>'+d.fields.map(f=>`<option>${esc(f)}</option>`).join('')}
+  $('fbn').textContent=`${d.total} cell${d.total===1?'':'s'}${d.total>d.items.length?` (first ${d.items.length} shown)`:''}, ${kind==='silent'||kind==='confident_wrong'?'most confident first':'least confident first'}`;
+  $('fbgrid').innerHTML=d.items.length?d.items.map(it=>{let rd='';it.ops.forEach(o=>{rd+=o.op==='ok'?esc(o.b):o.op==='sub'||o.op==='ins'?`<span class="x">${esc(o.b)}</span>`:`<span class="x" title="missing ${esc(o.a)}">&middot;</span>`});
+   return `<figure class="fbt"><img loading="lazy" src="${it.crop}" alt="crop of ${esc(it.field)} on ${esc(it.page)}"><div class="rd2">${esc(it.label)} &rarr; ${rd||'<span class="x">(blank)</span>'}</div><div class="cf" title="confidence ${it.conf}"><i style="width:${it.conf*100}%"></i></div><div class="tag">${esc(it.field)} · ${esc(it.col)} · ${esc(it.page)} · conf ${it.conf}</div></figure>`}).join(''):'<div class="tag">None.</div>'}catch(e){$('fbgrid').innerHTML=`<div class="msg bad">${esc(e.message)}</div>`}}
+let TUNE=null;
+async function tunerInit(run){try{const [pol,cal]=await Promise.all([api('/api/ml/policy?run='+enc(run)),api('/api/ml/calibration?run='+enc(run))]);TUNE={pol,cal,mode:'rule',t:0.7,target:2};
+  $('recal').innerHTML=mlCalib({bins:cal.bins_before.map(b=>({...b,hi:b.lo+.1})),ece:cal.ece_before},'Calibration, as trained')+mlCalib({bins:cal.bins_after.map(b=>({...b,hi:b.lo+.1})),ece:cal.ece_after},'After recalibration (cross-fitted)');
+  tunerDraw()}catch(e){$('tunerbody').innerHTML=`<span class="bad">${esc(e.message)}</span>`}}
+function tunerCalc(mode,t){const {cells,min_confidence:mc}=TUNE.pol,n=cells.length;let acc=0,ok=0,flagged=0,blank=0;
+ for(const c of cells){if(!c.r){blank++;continue}const keep=mode==='rule'?c.c>=(mc[c.f]||0):mode==='raw'?c.c>=t:c.cc>=t;if(keep){acc++;ok+=c.ok}else flagged++}
+ return {n,acc,ok,flagged,blank,coverage:acc/n,accuracy:acc?ok/acc:null,silent:(acc-ok)/n}}
+function tunerCutoff(mode,target){for(let t=0;t<=1.0001;t+=.005){const r=tunerCalc(mode,t);if(r.silent<=target/100)return {t,r}}return null}
+function tunerDraw(){const T=TUNE,m=T.mode,r=tunerCalc(m,T.t),base=tunerCalc('rule'),W=360,H=220,L=40,Rr=10,Tp=12,B=32,X=v=>L+(W-L-Rr)*v;
+ const curve=mode=>{const pts=[];for(let t=0;t<=1.0001;t+=.02){const q=tunerCalc(mode,t);if(q.accuracy!=null)pts.push(q)}return pts};
+ const raw=curve('raw'),cal=curve('cal'),lo=Math.floor(Math.min(...raw.concat(cal).map(p=>p.accuracy),.9)*10)/10,Y=v=>Tp+(H-Tp-B)*(1-(v-lo)/(1-lo));let g='';
+ for(let v=lo;v<=1.0001;v+=(1-lo)>.5?.2:.1)g+=`<line x1="${L}" x2="${W-Rr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${L-5}" y="${Y(v)+4}" text-anchor="end">${(v*100).toFixed(0)}</text>`;
+ for(const v of [0,.25,.5,.75,1])g+=`<text x="${X(v)}" y="${H-16}" text-anchor="middle">${v*100}</text>`;
+ g+=`<polyline fill="none" stroke="var(--s1)" stroke-width="2" points="${raw.map(p=>`${X(p.coverage)},${Y(p.accuracy)}`).join(' ')}"/><polyline fill="none" stroke="var(--s3)" stroke-width="2" stroke-dasharray="5 3" points="${cal.map(p=>`${X(p.coverage)},${Y(p.accuracy)}`).join(' ')}"/>`;
+ if(base.accuracy!=null)g+=`<circle cx="${X(base.coverage)}" cy="${Y(base.accuracy)}" r="6" fill="none" stroke="var(--s2)" stroke-width="2.5"><title>shipped rule</title></circle>`;
+ if(r.accuracy!=null)g+=`<circle cx="${X(r.coverage)}" cy="${Y(r.accuracy)}" r="5" fill="var(--ink)"><title>current setting</title></circle>`;
+ g+=`<text x="${(L+W-Rr)/2}" y="${H-2}" text-anchor="middle">coverage: share accepted without review, %</text>`;
+ const k=(a,b,c)=>`<span class="k"><b ${c||''}>${b}</b><span class="tag">${a}</span></span>`,tg=tunerCutoff(m==='cal'?'cal':'raw',T.target);
+ $('tunerbody').innerHTML=`<div class="tune"><div>
+  <div class="row"><label><input type="radio" name="tm" ${m==='rule'?'checked':''} onchange="TUNE.mode='rule';tunerDraw()"> shipped per-field rule</label><label><input type="radio" name="tm" ${m==='raw'?'checked':''} onchange="TUNE.mode='raw';tunerDraw()"> one cutoff on raw confidence</label><label><input type="radio" name="tm" ${m==='cal'?'checked':''} onchange="TUNE.mode='cal';tunerDraw()"> one cutoff on recalibrated confidence</label></div>
+  ${m==='rule'?'<div class="tag">The app flags a read when its confidence is under that field\'s own minimum (0.7 for numbers, 0.5 for marks). Switch mode to try a single cutoff.</div>':`<div class="row"><label style="display:block;width:100%">Cutoff <b>${T.t.toFixed(2)}</b><input type="range" min="0" max="1" step="0.01" value="${T.t}" style="width:100%" oninput="TUNE.t=+this.value;tunerDraw()"></label></div>`}
+  <div style="margin:8px 0">${k('auto-accepted',f0(r.coverage))}${k('accuracy of those',f0(r.accuracy))}${k('silent errors (of all cells)',f2(r.silent),r.silent>0.05?'class="warn"':'')}${k('flagged for review',r.flagged)}</div>
+  <div class="tag">Shipped rule for comparison: ${f0(base.coverage)} accepted, ${f0(base.accuracy)} accurate, ${f2(base.silent)} silent errors, ${base.flagged} flagged. ${r.blank} cells were read as blank; the app never flags blanks.</div>
+  <div class="row" style="margin-top:12px"><label style="display:block;width:100%">Silent errors allowed: <b>${T.target}%</b> of cells<input type="range" min="0" max="10" step="0.5" value="${T.target}" style="width:100%" oninput="TUNE.target=+this.value;tunerDraw()"></label></div>
+  <div class="tag">${tg?`That needs a cutoff of about <b>${tg.t.toFixed(2)}</b> on ${m==='cal'?'recalibrated':'raw'} confidence: ${f0(tg.r.coverage)} auto-accepted, ${f0(tg.r.accuracy)} accurate, ${tg.r.flagged} flagged.`:'No cutoff gets that low: even the most confident reads are wrong too often.'}</div></div>
+  <div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Accuracy against coverage for raw and recalibrated confidence">${g}</svg><div class="tag"><span style="color:var(--s1)">&#9644;</span> raw confidence <span style="color:var(--s3)">&#9644;</span> recalibrated (cross-fitted) &nbsp; ring = shipped rule, dot = current setting. Recalibration changes which cells fall above a cutoff, not the reader.</div></div></div>`}
+async function curvesInit(run){const box=$('curves');try{const d=await api('/api/ml/curves?run='+enc(run));
+ if(!d.folds.length){box.innerHTML=`<div class="card"><h2>Learning curves</h2><div class="tag">${esc(d.note)}</div></div>`;return}
+ const ln=(key,title,fmt,lo,hi)=>{const W=360,H=200,L=44,R=10,T=12,B=28,all=d.folds.flatMap(f=>f.history.map(h=>h[key])),mn=lo??Math.min(...all),mx=hi??Math.max(...all),ne=Math.max(...d.folds.map(f=>f.history.length)),X=e=>L+(W-L-R)*e/(ne-1||1),Y=v=>T+(H-T-B)*(1-(v-mn)/(mx-mn||1));let g='';
+  for(let i=0;i<=4;i++){const v=mn+(mx-mn)*i/4;g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${L-5}" y="${Y(v)+4}" text-anchor="end">${fmt(v)}</text>`}
+  const cols=['var(--s1)','var(--s2)','var(--s3)','#a78bfa','#f59e0b'];
+  d.folds.forEach((f,i)=>{g+=`<polyline fill="none" stroke="${cols[i%5]}" stroke-width="1.5" opacity=".85" points="${f.history.map(h=>`${X(h.epoch)},${Y(h[key])}`).join(' ')}"><title>fold ${f.fold}, best epoch ${f.best_epoch}</title></polyline><line x1="${X(f.best_epoch)}" x2="${X(f.best_epoch)}" y1="${T}" y2="${H-B}" stroke="${cols[i%5]}" stroke-dasharray="3 3" opacity=".5"/>`});
+  return `<div class="card"><h2>${title}</h2><svg viewBox="0 0 ${W} ${H}">${g}<text x="${(L+W-R)/2}" y="${H-6}" text-anchor="middle">epoch (dashed = best epoch per fold)</text></svg></div>`};
+ box.innerHTML=`<div class="mlg">${ln('loss','Training loss, each CV fold',v=>v.toFixed(2))}${ln('val_exact','Validation exact match, each CV fold',v=>(v*100).toFixed(0)+'%',0,1)}</div><div class="tag" style="margin-bottom:12px">${esc(d.note)}</div>`}catch(e){box.innerHTML=`<div class="msg bad">${esc(e.message)}</div>`}}
+async function provInit(run){try{const d=await api('/api/ml/provenance?run='+enc(run)),sc=s=>/^recorded/.test(s)&&!/vs now/.test(s)?'bg-green-lt':/vs now/.test(s)?'bg-blue-lt':/^inferred/.test(s)?'bg-orange-lt':'bg-secondary-lt';
+ $('provbody').innerHTML=`<table class="table table-vcenter"><tr><th>What</th><th>Value</th><th>Source</th></tr>${d.items.map(i=>`<tr><td>${esc(i.name)}</td><td>${esc(i.value)}</td><td><span class="badge srcb ${sc(i.source)}">${esc(i.source)}</span></td></tr>`).join('')}</table><div class="tag">${d.recorded_by_trainer?'Recorded by the trainer when the run finished.':'This run predates provenance records, so only what was kept in its folder is shown. New runs record the crops hash, code hashes and package versions.'} There is no git repository, so code is identified by file hashes.</div>`}catch(e){$('provbody').innerHTML=`<span class="bad">${esc(e.message)}</span>`}}
+
+/* ---------- History: paired comparison and experiment records */
+async function pairedShow(a,b){const o=document.createElement('div');$('cmp').appendChild(o);o.innerHTML='<div class="card"><div class="tag">Paired comparison…</div></div>';
+ try{const r=await api(`/api/compare/paired?a=${enc(a)}&b=${enc(b)}`),[lo,hi]=r.ci_page_bootstrap,sig=lo>0?'bg-green-lt':hi<0?'bg-red-lt':'bg-secondary-lt',verdict=lo>0?`${esc(b)} is better`:hi<0?`${esc(a)} is better`:'no clear difference';
+  o.innerHTML=`<div class="card"><h2>Paired comparison <span class="tag">same cells, ${r.common} in common on ${r.pages} pages</span></h2>
+   <div class="stats" style="margin-bottom:10px"><div class="card stat"><div class="subheader">Accuracy difference (b minus a)</div><div class="h1">${pp(r.diff)}</div><div class="tag">95% interval, resampling pages: [${pp(lo)}, ${pp(hi)}] <span class="badge ${sig}">${verdict}</span></div></div>
+   <div class="card stat"><div class="subheader">Cells that differ</div><div class="h1">${r.only_b} vs ${r.only_a}</div><div class="tag">only ${esc(b)} right vs only ${esc(a)} right · ${r.both} both right · ${r.neither} both wrong</div></div>
+   <div class="card stat"><div class="subheader">McNemar exact p</div><div class="h1">${r.p_mcnemar<0.001?'<0.001':r.p_mcnemar.toFixed(3)}</div><div class="tag">optimistic: treats cells as independent</div></div></div>
+   <table class="table table-vcenter"><tr><th>Field</th><th>n</th><th>only ${esc(a)}</th><th>only ${esc(b)}</th><th>Change</th><th>p</th></tr>${r.fields.map(f=>`<tr><td>${esc(f.field)}</td><td>${f.n}</td><td>${f.only_a}</td><td>${f.only_b}</td><td class="${f.delta>0?'ok':f.delta<0?'warn':''}">${pp(f.delta)}</td><td>${f.p<0.001?'<0.001':f.p.toFixed(2)}</td></tr>`).join('')}</table>
+   <ul class="tag" style="padding-left:18px">${r.notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul></div>`}catch(e){o.innerHTML=`<div class="card"><div class="tag">Paired comparison unavailable: ${esc(e.message)}</div></div>`}}
+async function loadExperiments(){try{const list=await api('/api/experiments');$('exps').innerHTML=list.length?list.map(e=>`<details class="st" ontoggle="if(this.open)expOpen('${e.id}',this)"><summary><b>${esc(e.title)}</b> <span class="badge bg-secondary-lt">${esc(e.kind||'')}</span> <span class="tag">${esc(e.saved||'')}</span></summary><div class="expbody tag" style="padding:8px 0">loading…</div></details>`).join(''):'<div class="tag">No experiments recorded yet. Scripts in work_phaseA write them with experiments.py.</div>'}catch(e){$('exps').innerHTML=`<span class="bad">${esc(e.message)}</span>`}}
+async function expOpen(id,el){const box=el.querySelector('.expbody');if(box.dataset.done)return;box.dataset.done=1;try{const e=await api('/api/experiments/'+enc(id));
+ const base=(e.baselines||[]).map(b=>`<tr><td>${esc(b.name)}${b.note?`<div class="tag">${esc(b.note)}</div>`:''}</td><td>${b.k}/${b.n} = ${f0(b.exact)} <span class="tag">[${f0(b.lo)}–${f0(b.hi)}]</span></td><td>${b.cer!=null?b.cer.toFixed(3):'-'}</td><td class="tag">baseline</td></tr>`).join('');
+ const tr=(e.treatments||[]).map(t=>{const s=t.stats;return `<tr><td>${esc(t.name)}<div class="tag">seeds: ${t.seeds.map(x=>`${x.seed}: ${x.k}/${x.n}`).join(' · ')}</div></td><td><b>${f0(s.mean)}</b> ± ${s.sd==null?'n/a':(s.sd*100).toFixed(1)+' pts'}<div class="tag">${s.seeds} seeds, range ${f0(s.min)}–${f0(s.max)}</div></td><td>${s.mean_cer!=null?s.mean_cer.toFixed(3):'-'}</td><td class="tag">treatment</td></tr>`}).join('');
+ const tb=e.table?`<div class="tag" style="margin-top:8px"><b>${esc(e.table.title)}</b></div><table class="table table-vcenter"><tr><th></th>${e.table.columns.map(c=>`<th>${esc(c)}</th>`).join('')}</tr>${e.table.rows.map(r=>`<tr><td>${esc(r.label)}</td>${r.cells.map(c=>`<td>${c.v.toFixed(1)}${c.lo!=null?`<div class="tag">${c.lo.toFixed(0)}–${c.hi.toFixed(0)}</div>`:''}</td>`).join('')}</tr>`).join('')}</table>`:'';
+ const tc=(e.test_confirmations||[]).map(t=>`<div class="tag" style="margin-top:6px"><b>Test confirmation: ${esc(t.variant)}</b> (${t.n} cells, read once): ${Object.entries(t.conditions).map(([c,v])=>`${esc(c)} ${v.baseline.toFixed(0)}→${v.treated.toFixed(0)} (${v.diff_pp>=0?'+':''}${v.diff_pp.toFixed(1)} pp)`).join(' · ')}</div>`).join('');
+ box.innerHTML=`<div><b>Question.</b> ${esc(e.question||'')}</div><div style="margin-top:4px"><b>Data.</b> ${Object.values(e.data||{}).map(x=>esc(String(x))).join(' · ')}</div>${e.recipe?`<div style="margin-top:4px"><b>Recipe.</b> ${esc(e.recipe)}</div>`:''}
+  ${base||tr?`<table class="table table-vcenter" style="margin-top:8px"><tr><th>Setup</th><th>Exact match</th><th>CER</th><th></th></tr>${base}${tr}</table>`:''}${tb}${tc}
+  <ul style="padding-left:18px;margin-top:8px">${(e.notes||[]).map(n=>`<li>${esc(n)}</li>`).join('')}</ul><div>Sources: ${(e.source_files||[]).map(x=>`<code>${esc(x)}</code>`).join(', ')}</div>`}catch(er){box.innerHTML=`<span class="bad">${esc(er.message)}</span>`}}
+themeUI();
+</script></body></html>

@@ -1,0 +1,359 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "cardpack manifest",
+  "type": "object",
+  "required": [
+    "format",
+    "id",
+    "version",
+    "name",
+    "created",
+    "template",
+    "match",
+    "grid",
+    "preprocess",
+    "reader",
+    "fields",
+    "fallback",
+    "metrics",
+    "files"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "cardpack/1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "width",
+        "height",
+        "grid_scale"
+      ],
+      "properties": {
+        "file": {
+          "const": "template.png"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "grid_scale": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "grid.json pixels = template pixels * grid_scale"
+        }
+      }
+    },
+    "match": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "detect_long_side",
+        "ratio",
+        "ransac_px",
+        "min_matches",
+        "min_inliers"
+      ],
+      "properties": {
+        "method": {
+          "const": "sift-ransac"
+        },
+        "detect_long_side": {
+          "type": "integer",
+          "minimum": 200
+        },
+        "ratio": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "ransac_px": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "min_matches": {
+          "type": "integer",
+          "minimum": 4
+        },
+        "min_inliers": {
+          "type": "integer",
+          "minimum": 4,
+          "description": "below this the card is reported as unknown type; the pack is never used"
+        }
+      }
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "type",
+        "cell_margin"
+      ],
+      "properties": {
+        "file": {
+          "const": "grid.json"
+        },
+        "type": {
+          "const": "ruled-columns-v1"
+        },
+        "cell_margin": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "preprocess": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "flatten_kernel",
+        "remove_lines",
+        "ink_gate"
+      ],
+      "properties": {
+        "flatten_kernel": {
+          "type": "integer",
+          "minimum": 3
+        },
+        "remove_lines": {
+          "type": "boolean"
+        },
+        "ink_gate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dark_below",
+            "min_dark_pixels",
+            "min_dark_fraction"
+          ],
+          "properties": {
+            "dark_below": {
+              "type": "integer"
+            },
+            "min_dark_pixels": {
+              "type": "integer"
+            },
+            "min_dark_fraction": {
+              "type": "number"
+            }
+          }
+        },
+        "normalize": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "default"
+          ],
+          "properties": {
+            "default": {
+              "enum": [
+                "flatten",
+                "contrast_match",
+                "cell_stretch",
+                "flatten_cell_stretch",
+                "none"
+              ]
+            },
+            "reference": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mean",
+                "std",
+                "source"
+              ],
+              "properties": {
+                "mean": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 255
+                },
+                "std": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 128
+                },
+                "source": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "reader": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "input",
+        "output",
+        "decode",
+        "confidence"
+      ],
+      "properties": {
+        "file": {
+          "const": "reader.onnx"
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "height",
+            "width",
+            "mean",
+            "std"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "height": {
+              "type": "integer"
+            },
+            "width": {
+              "type": "integer"
+            },
+            "mean": {
+              "type": "number"
+            },
+            "std": {
+              "type": "number"
+            }
+          }
+        },
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "layout"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "layout": {
+              "const": "TBV"
+            }
+          }
+        },
+        "decode": {
+          "const": "ctc-greedy-masked"
+        },
+        "confidence": {
+          "const": "min-char-softmax"
+        }
+      }
+    },
+    "fields": {
+      "const": "fields.json"
+    },
+    "fallback": {
+      "const": "fallback.json"
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "heldout"
+      ],
+      "properties": {
+        "heldout": {
+          "description": "null = this exact reader has no held-out evaluation",
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "required": [
+                "split_unit",
+                "split_file_sha256",
+                "per_field"
+              ],
+              "properties": {
+                "split_unit": {
+                  "type": "string"
+                },
+                "split_file_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "per_field": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "required": [
+                      "n",
+                      "correct",
+                      "ci95"
+                    ],
+                    "properties": {
+                      "n": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "correct": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "ci95": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 2,
+                        "maxItems": 2
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "files": {
+      "type": "object",
+      "minProperties": 1,
+      "description": "sha256 of every other file in the archive",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    }
+  }
+}

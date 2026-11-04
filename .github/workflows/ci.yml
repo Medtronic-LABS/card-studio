@@ -1,0 +1,15 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install numpy opencv-python-headless onnxruntime pillow pypdfium2
+      - run: python tools/leakcheck.py .
+      - run: CARDPACK_SYNTHETIC=1 python cardpack/test_cardpack.py
+      - run: python -m unittest discover -s studio/tests
+      - run: python -m unittest discover -s tools -p "test_*.py"

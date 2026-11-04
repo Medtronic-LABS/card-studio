@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "cardpack grid (ruled-columns-v1)",
+  "type": "object",
+  "required": ["image_size", "rows", "y_ref_top", "y_ref_bot", "col_lines_top", "col_lines_bot", "row_lines_by_col"],
+  "properties": {
+    "image_size": {"type": "array", "items": {"type": "integer", "minimum": 1}, "minItems": 2, "maxItems": 2},
+    "rows": {"type": "array", "items": {"type": "string", "pattern": "^[A-Za-z0-9_]{1,40}$"}, "minItems": 1, "uniqueItems": true},
+    "y_ref_top": {"type": "number"}, "y_ref_bot": {"type": "number"},
+    "col_lines_top": {"type": "array", "items": {"type": "number"}, "minItems": 2},
+    "col_lines_bot": {"type": "array", "items": {"type": "number"}, "minItems": 2},
+    "row_lines_by_col": {"type": "array", "minItems": 1, "items": {"type": "array", "items": {"type": "number"}, "minItems": 2}}
+  }
+}
