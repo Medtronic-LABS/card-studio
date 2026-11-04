@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DST = ROOT / ".dist" / "public-repo"
-REPO = "Medtronic-LABS/card-ocr-platform"
+REPO = "Medtronic-LABS/card-studio"
 DESC = "Local-first platform for reading handwritten health cards: Card Studio, a portable card-pack format, and held-out evaluation. Code and docs only; no patient data."
 INCLUDE = ["model_meta.json", "studio/*.py", "studio/tests/*.py", "studio/static/index.html", "studio/static/vendor/tabler.min.css", "studio/static/vendor/TABLER-LICENSE.txt",
            "cardpack/CARDPACK.md", "cardpack/*.py", "cardpack/schema/*.json", "work_phaseA/*.py", "tools/*.py", "tools/README.template.md",

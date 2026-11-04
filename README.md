@@ -1,4 +1,4 @@
-# Card OCR Platform
+# Card Studio
 
 A local-first platform for reading **handwritten health cards**: teach it a card, measure how well it reads each field on pages it has not seen, and ship the result to a phone as a self-contained **card pack**.
 
