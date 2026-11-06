@@ -1,12 +1,12 @@
 {
- "captured": "2026-11-04",
+ "captured": "2026-11-06",
  "mode": "?shots=1 (no patient images are built)",
  "screenshots": [
   {
    "file": "docs/screenshots/dashboard.png",
    "view": "dashboard",
    "caption": "Dashboard: model registry, getting started, activity, needs attention, field readiness",
-   "sha256": "f2fcd3544067ab59666e26f5e879a18c580c8593a832bd4f2bc9db480ae30b06",
+   "sha256": "4371bc4507732162596b6c6f6fe9cb80c18343ee4aee106256b5ad82334bcd68",
    "images_on_page": 0
   },
   {

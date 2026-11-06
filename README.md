@@ -8,7 +8,7 @@ Everything runs on one machine and binds to `127.0.0.1` only. There are no cloud
 
 ## Status
 
-_Aggregate numbers from the author's own labeled data, updated 2026-11-04. Held-out = pooled 5-fold cross-validation split by page._
+_Aggregate numbers from the author's own labeled data, updated 2026-11-06. Held-out = pooled 5-fold cross-validation split by page._
 
 | | |
 |---|---|
