@@ -82,7 +82,7 @@ def _find_bar(g):
     h, w = g.shape; ink = ((g < 150) * 255).astype(np.uint8)
     segs = cv2.HoughLinesP(ink, 1, np.pi / 180, threshold=max(20, int(w * 0.25)), minLineLength=int(w * 0.4), maxLineGap=max(4, int(w * 0.06)))
     best = None
-    for x1, y1, x2, y2 in ([] if segs is None else segs[:, 0]):
+    for x1, y1, x2, y2 in ([] if segs is None else np.asarray(segs).reshape(-1, 4)):        # (n, 1, 4) in some OpenCV versions, (n, 4) in others
         if x2 == x1: continue
         m = (y2 - y1) / (x2 - x1)
         if abs(m) > BAR_SLOPE: continue
