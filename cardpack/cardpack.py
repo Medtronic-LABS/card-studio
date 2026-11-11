@@ -1,5 +1,5 @@
 """Card pack: build, read and validate `.cardpack` archives. See CARDPACK.md.
-A pack is a zip with exactly: manifest.json, template.png, grid.json, fields.json, reader.onnx, fallback.json.
+A pack is a zip with exactly: manifest.json, template.png, grid.json, fields.json, reader.onnx, fallback.json, and optionally reader.tflite.
 Local only; no network. Usage: python cardpack.py validate PACK [PACK...]"""
 import hashlib, io, json, sys, zipfile
 from pathlib import Path
@@ -7,6 +7,12 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REQUIRED = ["manifest.json", "template.png", "grid.json", "fields.json", "reader.onnx", "fallback.json"]
 HASHED = [n for n in REQUIRED if n != "manifest.json"]
+OPTIONAL = ["reader.tflite"]      # the same reader for TensorFlow Lite; described in manifest.reader.tflite
+
+
+def hashed(members):
+    """The members whose sha256 the manifest must list: every required one, plus the optional ones this pack carries."""
+    return HASHED + [n for n in OPTIONAL if n in members]
 MAX_MEMBER = 200 * 1024 * 1024
 SCHEMAS = {n: json.loads((HERE / "schema" / f"{n}.schema.json").read_text()) for n in ("manifest", "fields", "grid", "fallback")}
 
@@ -34,8 +40,8 @@ def read(path) -> dict:
     with zipfile.ZipFile(path) as z:
         for zi in z.infolist():
             n = zi.filename
-            if n not in REQUIRED:
-                raise ValueError(f"unexpected member {n!r} (only {REQUIRED} allowed)")
+            if n not in REQUIRED and n not in OPTIONAL:
+                raise ValueError(f"unexpected member {n!r} (only {REQUIRED + OPTIONAL} allowed)")
             if n in out:
                 raise ValueError(f"duplicate member {n!r}")
             if zi.file_size > MAX_MEMBER:
@@ -70,10 +76,37 @@ def derive(src, out_path, version, normalize):
         raise ValueError(f"version must be above {man['version']}")
     man["version"] = version; man["preprocess"]["normalize"] = normalize
     m["manifest.json"] = json.dumps(man, indent=1).encode()
-    man["files"] = {n: sha256(m[n]) for n in HASHED}
+    man["files"] = {n: sha256(m[n]) for n in hashed(m)}
     m["manifest.json"] = json.dumps(man, indent=1).encode()
     build(m, out_path)
     return validate(out_path, check_reader=False)
+
+
+def _tflite_interpreter():
+    """A TFLite interpreter class if one is installed here (LiteRT, tflite-runtime or TensorFlow), else None."""
+    for mod, attr in (("ai_edge_litert.interpreter", "Interpreter"), ("tflite_runtime.interpreter", "Interpreter")):
+        try: return getattr(__import__(mod, fromlist=[attr]), attr)
+        except Exception: pass
+    try:
+        import tensorflow as tf; return tf.lite.Interpreter
+    except Exception: return None
+
+
+def _check_tflite(blob, t, ncls):
+    """Load reader.tflite and run one blank cell. With no TFLite interpreter installed this is skipped (TensorFlow is large and only the
+    export step needs it); the parity numbers recorded in the manifest at export time are then the only evidence."""
+    if not blob.startswith(b"TFL3", 4): return ["reader.tflite: not a TFLite model"]
+    I = _tflite_interpreter()
+    if I is None: return []
+    try:
+        import numpy as np
+        it = I(model_content=blob); it.allocate_tensors(); i, o = it.get_input_details()[0], it.get_output_details()[0]
+        want = [1, t["input"]["height"], t["input"]["width"], 1]
+        if [int(v) for v in i["shape"]] != want: return [f"reader.tflite input is {[int(v) for v in i['shape']]}, manifest says {want}"]
+        it.set_tensor(i["index"], np.zeros(want, np.float32)); it.invoke(); out = it.get_tensor(o["index"])
+        return [] if out.ndim == 3 and out.shape[2] == ncls else [f"reader.tflite output {list(out.shape)} does not end in {ncls} classes"]
+    except Exception as e:
+        return [f"reader.tflite: {type(e).__name__}: {e}"]
 
 
 def validate(path, check_reader=True) -> list:
@@ -103,9 +136,11 @@ def validate(path, check_reader=True) -> list:
         errs.append("preprocess.normalize: contrast_match needs a reference (mean, std, source)")
 
     # integrity
-    if set(man["files"]) != set(HASHED):
-        errs.append(f"manifest.files must list exactly {HASHED}, got {sorted(man['files'])}")
-    for n in HASHED:
+    if set(man["files"]) != set(hashed(m)):
+        errs.append(f"manifest.files must list exactly {hashed(m)}, got {sorted(man['files'])}")
+    if ("reader.tflite" in m) != ("tflite" in man["reader"]):
+        errs.append("reader.tflite and manifest.reader.tflite go together: one is present without the other")
+    for n in hashed(m):
         if n in man["files"] and sha256(m[n]) != man["files"][n]:
             errs.append(f"{n}: sha256 does not match manifest")
 
@@ -205,6 +240,8 @@ def validate(path, check_reader=True) -> list:
             errs.append("cannot check reader.onnx: onnxruntime not installed")
         except Exception as e:
             errs.append(f"reader.onnx: {type(e).__name__}: {e}")
+        if "reader.tflite" in m and "tflite" in man["reader"]:
+            errs += _check_tflite(m["reader.tflite"], man["reader"]["tflite"], ncls)
     return errs
 
 

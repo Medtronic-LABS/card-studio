@@ -12,7 +12,7 @@ from pathlib import Path
 TEXT_EXT = {".py", ".md", ".html", ".css", ".txt", ".yml", ".yaml", ".toml", ".cfg"}
 NAMES_OK = {".gitignore", "LICENSE", "NOTICE", "requirements.txt"}
 JSON_OK = ["cardpack/schema/*.json", "model_meta.json", "docs/screenshots/MANIFEST.json", "docs/status.json"]
-DENY_EXT = {".onnx", ".pt", ".pth", ".ckpt", ".cardpack", ".csv", ".tsv", ".pdf", ".ipynb", ".npy", ".npz", ".h5", ".hdf5", ".zip", ".gz", ".tar", ".jpg", ".jpeg",
+DENY_EXT = {".onnx", ".tflite", ".pt", ".pth", ".ckpt", ".cardpack", ".csv", ".tsv", ".pdf", ".ipynb", ".npy", ".npz", ".h5", ".hdf5", ".zip", ".gz", ".tar", ".jpg", ".jpeg",
             ".gif", ".bmp", ".tif", ".tiff", ".heic", ".webp", ".db", ".sqlite", ".pkl", ".pickle", ".log", ".docx", ".xlsx", ".mp4", ".mov"}
 DENY_DIRS = {"work", "data", "runs", "uploads", "templates", "imports", "experiments", "out", "crops", "aligned", "raw", "cards"}
 SKIP_CONTENT = {"studio/static/vendor/tabler.min.css"}          # vendored third-party CSS: allowed, not scanned

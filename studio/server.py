@@ -8,7 +8,7 @@ import cv2
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cardpack"))
 import cardpack as cp
 from detect import detect_layout, load_normalized, match_score
-import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio
+import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export
 from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
@@ -338,6 +338,12 @@ class H(BaseHTTPRequestHandler):
                 body, ctype, fn = history.run_file(m[1], m[3]); return self._attach(body, ctype, fn)
             except KeyError as e: return self._err(404, str(e).strip("'\""))
             except ValueError as e: return self._err(400, str(e))
+        m = re.fullmatch(r"/api/pack/([\w.-]+)/reader\.tflite", p)
+        if m:
+            f = HERE.parent / "cardpack" / "out" / m[1]
+            if not PACKFILE.match(m[1]) or not f.exists(): return self._err(404, "no such pack")
+            blob = cp.read(f).get("reader.tflite")
+            return self._attach(blob, "application/octet-stream", f"{f.stem}_reader.tflite") if blob else self._err(404, "this pack has no TFLite reader")
         m = re.fullmatch(r"/api/pack/([\w.-]+)/download", p)
         if m:
             f = HERE.parent / "cardpack" / "out" / m[1]
@@ -395,6 +401,13 @@ class H(BaseHTTPRequestHandler):
                 if m[2] == "label": return self._send(200, labeling.save(m[1], *cell, str(r.get("label", "")), str(r.get("note", "")), bool(r.get("confirm"))))
                 if m[2] == "label/clear": return self._send(200, labeling.clear(m[1], *cell))
                 return self._send(200, labeling.set_field(m[1], str(r.get("key", "")), str(r.get("kind", "")), r.get("range")))
+            m = re.fullmatch(r"/api/pack/([\w.-]+)/tflite", self.path)
+            if m:
+                f = HERE.parent / "cardpack" / "out" / m[1]
+                if not PACKFILE.match(m[1]) or not f.exists(): raise KeyError("no such pack")
+                try: r = tflite_export.add_to_pack(f)
+                except tflite_export.Unavailable as e: return self._err(503, str(e))
+                return self._send(200, {"file": Path(r["pack"]).name, "version": r["version"], "errors": r["errors"], "tflite": r["tflite"]})
             m = re.fullmatch(r"/api/card/([\w-]{1,40})/labelstudio/(push|pull)", self.path)
             if m:
                 try: return self._send(200, labelstudio.push(m[1]) if m[2] == "push" else labelstudio.pull(m[1]))

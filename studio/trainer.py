@@ -128,6 +128,13 @@ def main():
         same = all(C.decode_app(lt[:, i], r["row"])[0] == C.decode_app(lo[:, i], r["row"])[0] for i, r in enumerate(sample))
         parity = dict(cells=len(sample), max_abs_diff=float(np.abs(lt - lo).max()), decode_equal=bool(same))
         assert parity["decode_equal"] and parity["max_abs_diff"] < 1e-3, f"ONNX parity failed: {parity}"
+        # the same weights for TensorFlow Lite (phones). Optional: without a TensorFlow environment the pack ships the ONNX reader only.
+        status("export", "TFLite conversion and parity check")
+        import tflite_export
+        try:
+            tfl_bytes, tfl = tflite_export.export(onnx_path.read_bytes(), samples=x[:, 0]); (run / "reader.tflite").write_bytes(tfl_bytes); tfl = {"built": True, **tfl}
+        except (tflite_export.Unavailable, ValueError, OSError) as e:
+            tfl_bytes, tfl = None, {"built": False, "reason": str(e)}
 
         # ---- gate + pack
         import cardpack as cp
@@ -154,13 +161,15 @@ def main():
                                       "reader_trained_on": f"all {len(pages)} labeled pages for {epochs} epochs (the shipped weights have no held-out number of their own)",
                                       "gate": {"target_lower_bound_pct": a.target, "min_n": a.min_n},
                                       "per_field": {k: dict(n=v["n"], correct=v["k"], ci95=[round(v["lo"], 4), round(v["hi"], 4)]) for k, v in cv.items()}}}
+        mem.pop("reader.tflite", None); man["reader"].pop("tflite", None)
+        if tfl_bytes: mem["reader.tflite"] = tfl_bytes; man["reader"]["tflite"] = tflite_export.manifest_entry(tfl, man["reader"])
         mem["reader.onnx"] = onnx_path.read_bytes(); mem["fields.json"] = json.dumps(fld, indent=1, ensure_ascii=False).encode()
-        man["files"] = {n: cp.sha256(mem[n]) for n in cp.HASHED}; mem["manifest.json"] = json.dumps(man, indent=1).encode()
+        man["files"] = {n: cp.sha256(mem[n]) for n in cp.hashed(mem)}; mem["manifest.json"] = json.dumps(man, indent=1).encode()
         out_pack = cards.PACKS / f"{man['id']}_v{man['version']}.cardpack"; out_pack.parent.mkdir(parents=True, exist_ok=True); cp.build(mem, out_pack)
         errs = cp.validate(out_pack)
         crops_note = "stored gray crops (work/crops) or imported crops" if a.card == cards.LEGACY else f"stored gray crops (studio/cards/{a.card}/crops) or imported crops"
         res = dict(card=a.card, dropped_labels=dropped, config=CFG, target=a.target, min_n=a.min_n, n_cells=len(rows), n_pages=len(pages), folds=[len(f) for f in folds], best_epochs=sorted(bests),
-                   final_epochs=epochs, cv_all=overall, parity=parity, minutes=round((time.time() - t0) / 60, 1),
+                   final_epochs=epochs, cv_all=overall, parity=parity, tflite=tfl, minutes=round((time.time() - t0) / 60, 1),
                    fields=[dict(field=k, **v, status=gate.get(k, ("needs-review", ""))[0], reason=gate.get(k, ("", ""))[1]) for k, v in sorted(cv.items(), key=lambda kv: -kv[1]["n"])],
                    unlabeled_fields=[f["key"] for f in fld["fields"] if f["key"] not in cv],
                    pack=dict(path=str(out_pack), id=man["id"], version=man["version"], validation_errors=errs, shipped=[k for k, v in gate.items() if v[0] == "ship"]),

@@ -275,6 +275,106 @@
         },
         "confidence": {
           "const": "min-char-softmax"
+        },
+        "tflite": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "file",
+            "input",
+            "output",
+            "dtype",
+            "parity"
+          ],
+          "description": "the same reader as reader.onnx for TensorFlow Lite, present when the pack carries reader.tflite",
+          "properties": {
+            "file": {
+              "const": "reader.tflite"
+            },
+            "input": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "layout",
+                "height",
+                "width",
+                "mean",
+                "std"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "layout": {
+                  "const": "NHWC"
+                },
+                "height": {
+                  "type": "integer"
+                },
+                "width": {
+                  "type": "integer"
+                },
+                "mean": {
+                  "type": "number"
+                },
+                "std": {
+                  "type": "number"
+                }
+              }
+            },
+            "output": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "layout"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "layout": {
+                  "const": "TBV"
+                }
+              }
+            },
+            "dtype": {
+              "const": "float32"
+            },
+            "ops": {
+              "type": "string"
+            },
+            "parity": {
+              "type": "object",
+              "required": [
+                "against",
+                "max_abs_diff",
+                "best_class_equal"
+              ],
+              "description": "how closely it reproduced reader.onnx when it was made",
+              "properties": {
+                "against": {
+                  "const": "reader.onnx"
+                },
+                "cells": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "random_cells": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "max_abs_diff": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "best_class_equal": {
+                  "const": true
+                }
+              }
+            }
+          }
         }
       }
     },

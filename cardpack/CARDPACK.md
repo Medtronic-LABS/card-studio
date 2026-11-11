@@ -2,7 +2,7 @@
 
 A card pack is everything the phone needs to recognise one type of card and read it, in one file. Packs are independent: adding a card type means adding a pack, not changing app code.
 
-A pack is a zip file named `<id>_v<version>.cardpack` containing exactly these six files and nothing else:
+A pack is a zip file named `<id>_v<version>.cardpack` containing exactly these six files, plus optionally `reader.tflite`, and nothing else:
 
 | File | What it is |
 |---|---|
@@ -12,6 +12,7 @@ A pack is a zip file named `<id>_v<version>.cardpack` containing exactly these s
 | `fields.json` | class list and, per field: kind, allowed classes, range, minimum confidence, ship / needs-review |
 | `reader.onnx` | the recogniser (CRNN, input `1x1xHxW`, output `T x B x classes`, CTC) |
 | `fallback.json` | when and how the slow second reader (Qwen) is used |
+| `reader.tflite` (optional) | the same recogniser for TensorFlow Lite: input `1xHxWx1`, output `T x 1 x classes`. See "TensorFlow Lite reader" |
 
 Schemas are in `schema/`. The validator is `cardpack.py`.
 
@@ -23,6 +24,19 @@ Schemas are in `schema/`. The validator is `cardpack.py`.
 - **Unknown card.** `match.min_inliers` is the floor. Below it the app reports an unknown card type and must not read with this pack.
 - **Determinism.** `cardpack.build` writes members sorted, with fixed timestamps, so unpacking and re-packing gives a byte-identical archive.
 - **Privacy.** A template can contain handwriting. Packs stay on local machines and are gitignored (`cardpack/out/`).
+
+## TensorFlow Lite reader
+
+`reader.tflite` holds the same weights as `reader.onnx`, converted by `studio/tflite_export.py`: float32, built-in TFLite operations only, nothing retrained or quantized. `manifest.reader.tflite` describes it and records how closely it reproduced the ONNX model when it was made (`parity`: largest logit difference, and that the best class at every step was the same, on real cells from the training run and on random input).
+
+| | `reader.onnx` | `reader.tflite` |
+|---|---|---|
+| input | `image`, float32 `[N, 1, H, W]` | float32 `[1, H, W, 1]` (one cell at a time) |
+| scaling | `(pixel / 255 - mean) / std` | the same |
+| output | `logits` `[T, N, classes]` | `[T, 1, classes]` |
+| decoding | masked greedy CTC, confidence = lowest character probability | the same |
+
+A pack either has both the file and the manifest block or neither. Held-out metrics apply to both readers, since the weights are the same. `cardpack.py validate` runs `reader.tflite` only where a TFLite interpreter is installed; elsewhere the recorded parity is the evidence.
 
 ## Grid types
 

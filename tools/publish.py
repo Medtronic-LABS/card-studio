@@ -23,6 +23,7 @@ studio/uploads/
 studio/templates/
 studio/cards/
 studio/.venv-labelstudio/
+studio/.venv-tflite/
 studio/labelstudio.json
 studio/labelstudio-data/
 studio/imports/
@@ -31,6 +32,7 @@ cardpack/out/
 .dist/
 *.cardpack
 *.onnx
+*.tflite
 *.pt
 *.pth
 *.pdf

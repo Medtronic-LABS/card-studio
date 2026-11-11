@@ -12,11 +12,11 @@ _Aggregate numbers from the author's own labeled data, updated 2026-11-11. Held-
 
 | | |
 |---|---|
-| Card types / pack versions | 1 / 4 |
+| Card types / pack versions | 1 / 5 |
 | Saved templates | 4 |
 | Labeled cells | 369 on 49 pages |
 | Training runs / experiment records | 2 / 4 |
-| Fields that meet the ship gate | 3 of 22 (anc v6) |
+| Fields that meet the ship gate | 3 of 22 (anc v7) |
 | Held-out exact match, latest run | 73% (95% 68% to 77%), 369 cells |
 | Held-out character error rate | 28.9% |
 | Calibration error (ECE) | 11.4 points |
@@ -55,7 +55,7 @@ _Aggregate numbers from the author's own labeled data, updated 2026-11-11. Held-
 | Piece | What it does |
 |---|---|
 | **Card Studio** (`studio/`) | A local web app: upload and identify a card, detect and edit its layout, add filled scans (each is matched to its template, straightened and cut into cells), label cells, train and gate a reader, compare runs, inspect model quality, and try photo clean-up options. Stdlib `http.server`, OpenCV, no framework. UI: [Tabler](https://tabler.io) (MIT), vendored, no CDN. |
-| **Card pack format** (`cardpack/`) | One zip holding everything a phone needs to recognise and read one card type: template, grid, field rules, reader model, preprocessing. Versioned, hashed, validated. See [`cardpack/CARDPACK.md`](cardpack/CARDPACK.md). |
+| **Card pack format** (`cardpack/`) | One zip holding everything a phone needs to recognise and read one card type: template, grid, field rules, reader model (ONNX, and the same weights as TensorFlow Lite), preprocessing. Versioned, hashed, validated. See [`cardpack/CARDPACK.md`](cardpack/CARDPACK.md). |
 | **Training recipe** (`work_phaseA/`) | CRNN + CTC reader (about 538k parameters), page-level splits, field-masked decoding, Wilson intervals. |
 | **Tools** (`tools/`) | The leak check, screenshot capture, README generator and publish script. |
 
@@ -70,6 +70,7 @@ A field is shipped only if the **lower end of its 95% interval**, measured on pa
 ```sh
 pip install numpy opencv-python onnxruntime pillow pypdfium2 jsonschema    # Studio
 pip install torch                                              # only for training
+python -m venv studio/.venv-tflite && studio/.venv-tflite/bin/pip install tensorflow onnx onnxruntime numpy   # only for the TFLite reader
 python studio/server.py                                        # http://127.0.0.1:8770
 ```
 

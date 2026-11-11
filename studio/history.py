@@ -1,6 +1,6 @@
 """Run history, run-to-run comparison, logs and downloads for Card Studio. Local files only (studio/runs/<name>/).
 
-A run folder holds status.json, results.json, cv_predictions.json, folds.json, merged_labels.csv, reader.onnx and log.txt
+A run folder holds status.json, results.json, cv_predictions.json, folds.json, merged_labels.csv, reader.onnx, reader.tflite (when made) and log.txt
 (older hand-made runs keep it as runs_<name>.log next to runs/ or in studio/). Nothing here writes to a run.
 """
 import csv, io, json, re, time, zipfile
@@ -45,7 +45,7 @@ def list_runs():
             "shipped": sum(f.get("status") == "ship" for f in fields), "fields": len(fields),
             "pack": ({"id": r["pack"]["id"], "version": r["pack"]["version"]} if r.get("pack") else None),
             "has_log": log_path(d) is not None, "has_predictions": (d / "cv_predictions.json").exists(),
-            "has_reader": (d / "reader.onnx").exists(),
+            "has_reader": (d / "reader.onnx").exists(), "has_tflite": (d / "reader.tflite").exists(),
         })
     return sorted(out, key=lambda x: -x["ts"])
 
@@ -121,7 +121,7 @@ def predictions_csv(name):
 def run_file(name, which):
     """Bytes + download name for one run artifact."""
     d = _dir(name)
-    files = {"reader.onnx": "application/octet-stream", "results.json": "application/json", "folds.json": "application/json",
+    files = {"reader.onnx": "application/octet-stream", "reader.tflite": "application/octet-stream", "results.json": "application/json", "folds.json": "application/json",
              "log.txt": "text/plain; charset=utf-8"}
     if which == "predictions.csv":
         return predictions_csv(name), "text/csv; charset=utf-8", f"{name}_predictions.csv"
