@@ -69,7 +69,7 @@ def list_templates():
         grid = None
         if gp.exists():
             g = json.loads(gp.read_text()); grid = {"rows": len(g["rows"]), "cols": len(g["col_lines_top"]) - 1}
-        out.append({"name": d.name, "latest": v[-1], "versions": v, **meta, "grid": grid})
+        out.append({"name": d.name, "latest": v[-1], "versions": v, **meta, "grid": grid, "grid_opts": meta.get("grid") if gp.exists() else None})
     return out
 
 
@@ -104,15 +104,23 @@ def labels_summary():
     return {"cells": len(cells), "pages": len({k[0] for k in cells}), "new": new}
 
 
-def template_grid(name, ver, label_cols=0, data_cols=None):
+def _grid_opts(get):
+    """label_cols, data_cols, label_rows, data_rows, axis from a query or a JSON body (`get(key)` -> value or None)."""
+    num = lambda k: int(get(k)) if get(k) not in (None, "") else None
+    return {"label_cols": num("label_cols") or 0, "data_cols": num("data_cols"), "label_rows": num("label_rows") or 0, "data_rows": num("data_rows"), "axis": get("axis") or "rows"}
+
+
+def template_grid(name, ver, label_cols=0, data_cols=None, label_rows=0, data_rows=None, axis="rows"):
     """Convert a saved Studio layout into a cardpack grid (see gridconv.py). Returns grid + warnings + errors."""
     f = TEMPLATES / name / f"v{int(ver)}" / "layout.json"
     if not NAME.match(name) or not f.exists():
         raise KeyError("no such template version")
     if not (0 <= label_cols <= 20) or (data_cols is not None and not (1 <= data_cols <= 60)):
         raise ValueError("label_cols 0-20, data_cols 1-60")
+    if not (0 <= label_rows <= 20) or (data_rows is not None and not (1 <= data_rows <= 99)):
+        raise ValueError("label_rows 0-20, data_rows 1-99")
     layout = json.loads(f.read_text())
-    grid, warnings = gridconv.layout_to_grid(layout, label_cols=label_cols, data_cols=data_cols)
+    grid, warnings = gridconv.layout_to_grid(layout, label_cols=label_cols, data_cols=data_cols, label_rows=label_rows, data_rows=data_rows, axis=axis)
     return {"grid": grid, "warnings": warnings, "errors": gridconv.check_grid(grid), "image": layout["image"]}
 
 
@@ -343,7 +351,7 @@ class H(BaseHTTPRequestHandler):
         if m:
             q = parse_qs(urlparse(self.path).query)
             try:
-                return self._send(200, template_grid(m[1], m[2], int(q.get("label_cols", ["0"])[0]), int(q["data_cols"][0]) if q.get("data_cols", [""])[0] else None))
+                return self._send(200, template_grid(m[1], m[2], **_grid_opts(lambda k: q.get(k, [None])[0])))
             except KeyError as e: return self._err(404, str(e).strip("'\""))
             except ValueError as e: return self._err(400, str(e))
         m = re.fullmatch(r"/api/template/([\w-]+)/(\d+)/(image|layout)", p)
@@ -411,13 +419,12 @@ class H(BaseHTTPRequestHandler):
         self._send(200, cleanup.analyze(load_normalized(data), UPLOADS, pack=pack, packs=packs))
 
     def _save_grid(self, req):
-        r = template_grid(req["name"], req["version"], int(req.get("label_cols", 0)), int(req["data_cols"]) if req.get("data_cols") else None)
+        opts = _grid_opts(req.get); r = template_grid(req["name"], req["version"], **opts)
         if r["errors"]:
             raise ValueError("grid is not valid: " + "; ".join(r["errors"]))
         d = TEMPLATES / req["name"] / f"v{int(req['version'])}"
         (d / "grid.json").write_text(json.dumps(r["grid"], indent=1))
-        meta = json.loads((d / "meta.json").read_text()); meta["grid"] = {"rows": len(r["grid"]["rows"]), "cols": len(r["grid"]["col_lines_top"]) - 1,
-                                                                        "label_cols": int(req.get("label_cols", 0)), "data_cols": req.get("data_cols")}
+        meta = json.loads((d / "meta.json").read_text()); meta["grid"] = {"rows": len(r["grid"]["rows"]), "cols": len(r["grid"]["col_lines_top"]) - 1, **opts}
         (d / "meta.json").write_text(json.dumps(meta))
         self._send(200, {"saved": True, "rows": len(r["grid"]["rows"]), "cols": len(r["grid"]["col_lines_top"]) - 1, "warnings": r["warnings"]})
 

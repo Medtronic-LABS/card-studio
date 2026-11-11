@@ -3,11 +3,14 @@
 `anc` is the first card and keeps its original places (work/labels.csv + labels_new.csv, work/crops, work/aligned; fields from
 model_meta.json; pack derived from the latest anc pack). Every other card is a saved Studio template that has a grid. Its data is in
 studio/cards/<name>/ (patient data: gitignored):
-    labels.csv                     one row per labeled cell, columns: page, row, col, label (row = grid row name, col = c1..cN)
+    labels.csv                     one row per labeled cell, columns: page, row, col, label (row = field key, col = visit c1..cN)
     crops/<row>/<col>/<page>.png   the cell image, same layout as work/crops
     aligned/<page>.png             scans warped onto the template at the grid's resolution (scans.py writes these and the crops)
     scans.csv, cells.csv           what scans.py recorded per scan and per cut cell (which cells have ink)
     fields.json                    optional, {"fields": {"<row>": {"kind": "number", "range": [30, 150]}}}; a row not listed is `text`
+
+A cell is always keyed (field, visit). On most cards a field is a grid row and a visit is a grid column; on a card whose grid says
+axis "columns" (one row per visit, like the NCD card) the field is the column and visit cN is the N-th row. Files keep the names row / col.
 
 All cards share one class list (model_meta.json) and one pretrained reader; a card only chooses which classes each field may emit."""
 import csv, json, re, time
@@ -68,9 +71,17 @@ def pack_grid(card):
     g = json.loads((template_dir(card) / "grid.json").read_text())
     k = min(3, max(1, round(GRID_LONG_SIDE / max(g["image_size"]))))
     f = lambda v: round(v * k, 1)
-    return {"image_size": [g["image_size"][0] * k, g["image_size"][1] * k], "rows": g["rows"], "y_ref_top": f(g["y_ref_top"]), "y_ref_bot": f(g["y_ref_bot"]),
-            "col_lines_top": [f(v) for v in g["col_lines_top"]], "col_lines_bot": [f(v) for v in g["col_lines_bot"]],
-            "row_lines_by_col": [[f(v) for v in col] for col in g["row_lines_by_col"]]}, float(k)
+    out = {"image_size": [g["image_size"][0] * k, g["image_size"][1] * k], "rows": g["rows"], "y_ref_top": f(g["y_ref_top"]), "y_ref_bot": f(g["y_ref_bot"]),
+           "col_lines_top": [f(v) for v in g["col_lines_top"]], "col_lines_bot": [f(v) for v in g["col_lines_bot"]],
+           "row_lines_by_col": [[f(v) for v in col] for col in g["row_lines_by_col"]]}
+    if g.get("axis") == "columns": out["axis"], out["cols"] = "columns", g["cols"]
+    return out, float(k)
+
+
+def grid_shape(g):
+    """{rows, cols, axis, fields, visits} of a grid, for display."""
+    r, c = len(g["rows"]), len(g["col_lines_top"]) - 1; by_col = g.get("axis") == "columns"
+    return {"rows": r, "cols": c, "axis": "columns" if by_col else "rows", "fields": c if by_col else r, "visits": r if by_col else c}
 
 
 def pack_versions(card):
@@ -79,15 +90,16 @@ def pack_versions(card):
 
 
 def fields(card):
-    """[{key, kind, range}] in grid row order. `anc`: every field in model_meta.json."""
+    """[{key, kind, range}] in grid order (rows, or columns when the grid's fields run down the columns). `anc`: every field in model_meta.json."""
     if card == LEGACY:
         return [{"key": k, "kind": META_KIND[v["type"]], "range": None} for k, v in meta()["fields"].items()]
-    rows = json.loads((template_dir(card) / "grid.json").read_text())["rows"]
+    import gridconv
+    rows = gridconv.field_names(json.loads((template_dir(card) / "grid.json").read_text()))
     fp = CARDS / card / "fields.json"
     spec = json.loads(fp.read_text()).get("fields", {}) if fp.exists() else {}
     unknown = sorted(set(spec) - set(rows))
     if unknown:
-        raise ValueError(f"fields.json names rows that are not in the grid: {', '.join(unknown)}")
+        raise ValueError(f"fields.json names fields that are not in the grid: {', '.join(unknown)}")
     out = []
     for r in rows:
         s = spec.get(r, {}); kind = s.get("kind", "text"); rng = s.get("range")
@@ -194,7 +206,7 @@ def base_members(card):
     man = {"format": "cardpack/1", "id": pid, "version": (pack_versions(card) or [0])[-1], "name": card, "created": time.strftime("%Y-%m-%d"),
            "template": {"file": "template.png", "width": tw, "height": th, "grid_scale": scale},
            "match": {"method": "sift-ransac", "detect_long_side": 1600, "ratio": 0.75, "ransac_px": 4.0, "min_matches": 10, "min_inliers": 40},
-           "grid": {"file": "grid.json", "type": "ruled-columns-v1", "cell_margin": CELL_MARGIN},
+           "grid": {"file": "grid.json", "type": "ruled-rows-v1" if grid.get("axis") == "columns" else "ruled-columns-v1", "cell_margin": CELL_MARGIN},
            "preprocess": {"flatten_kernel": 61, "remove_lines": True, "ink_gate": dict(INK_GATE)},
            "reader": {"file": "reader.onnx", "input": {"name": "image", "height": m["img_h"], "width": m["img_w"], "mean": 0.5, "std": 0.5},
                       "output": {"name": "logits", "layout": "TBV"}, "decode": "ctc-greedy-masked", "confidence": "min-char-softmax"},
@@ -214,7 +226,7 @@ def describe(card):
             if v is None:
                 out["blocker"] = "no grid saved for this template yet (Cards tab, Grid)"; return out
             g = json.loads((TEMPLATES / card / f"v{v}" / "grid.json").read_text())
-            out["template_version"] = v; out["grid"] = {"rows": len(g["rows"]), "cols": len(g["col_lines_top"]) - 1}
+            out["template_version"] = v; out["grid"] = grid_shape(g)
             if not PACK_ID.match(pack_id(card)):
                 out["blocker"] = "the template name cannot be used as a pack id"; return out
         elif not out["pack_versions"]:

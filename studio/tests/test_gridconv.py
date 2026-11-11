@@ -49,6 +49,40 @@ class Flat(unittest.TestCase):
         with self.assertRaises(ValueError): g.layout_to_grid(table(), label_cols=9)
 
 
+def visit_table(fields=("date", "bp", "weight", "note"), visits=5):
+    """A card with one row per visit: a heading row whose cells the user named, then the visit rows."""
+    L = table(rows=visits + 1, cols=len(fields), label=False)
+    for f in L["fields"]:
+        r, c = (int(v[1:]) for v in f["name"].split("_"))
+        if r == 1: f["name"] = fields[c - 1]
+    return L
+
+
+class FieldsDownColumns(unittest.TestCase):
+    def test_columns_are_named_from_the_heading_row_and_rows_are_visits(self):
+        grid, warn = g.layout_to_grid(visit_table(), axis="columns", label_rows=1)
+        self.assertEqual(g.check_grid(grid), [])
+        self.assertEqual((grid["axis"], grid["cols"], grid["rows"]), ("columns", ["date", "bp", "weight", "note"], ["r1", "r2", "r3", "r4", "r5"]))
+        self.assertEqual(g.field_names(grid), grid["cols"])
+        self.assertAlmostEqual(grid["row_lines_by_col"][0][0], 100 + 30 - 1, delta=2)       # the heading row is not a visit
+
+    def test_unnamed_columns_and_row_limits(self):
+        L = visit_table(); next(f for f in L["fields"] if f["name"] == "bp")["name"] = "r1_c2"
+        grid, _ = g.layout_to_grid(L, axis="columns", label_rows=1, data_rows=3, label_cols=1)
+        self.assertEqual((grid["cols"], grid["rows"]), (["col_01", "weight", "note"], ["r1", "r2", "r3"]))
+        with self.assertRaises(ValueError): g.layout_to_grid(L, axis="columns", label_rows=9)
+        with self.assertRaises(ValueError): g.layout_to_grid(L, axis="diagonal")
+
+    def test_heading_rows_can_be_skipped_on_a_row_field_card_too(self):
+        grid, _ = g.layout_to_grid(table(), label_cols=1, data_cols=4, label_rows=1, data_rows=4)
+        self.assertEqual((len(grid["rows"]), "axis" in grid, g.field_names(grid)), (4, False, grid["rows"]))
+
+    def test_checker_wants_one_unique_name_per_column(self):
+        grid, _ = g.layout_to_grid(visit_table(), axis="columns", label_rows=1)
+        self.assertTrue(g.check_grid({**grid, "cols": grid["cols"][:-1]})); self.assertTrue(g.check_grid({**grid, "cols": ["a", "a", "b", "c"]}))
+        plain, _ = g.layout_to_grid(table(), label_cols=1); self.assertTrue(g.check_grid({**plain, "cols": ["a"]}))
+
+
 class Checker(unittest.TestCase):
     def good(self):
         return g.layout_to_grid(table(), 1, 4)[0]

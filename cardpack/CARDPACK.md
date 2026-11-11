@@ -8,7 +8,7 @@ A pack is a zip file named `<id>_v<version>.cardpack` containing exactly these s
 |---|---|
 | `manifest.json` | identity, version, match settings, preprocessing settings, reader I/O contract, metrics, sha256 of every other file |
 | `template.png` | the blank card the phone matches photos against (grayscale) |
-| `grid.json` | row and column line positions in template space (`ruled-columns-v1`) |
+| `grid.json` | row and column line positions in template space (`ruled-columns-v1`, or `ruled-rows-v1`: see Grid types) |
 | `fields.json` | class list and, per field: kind, allowed classes, range, minimum confidence, ship / needs-review |
 | `reader.onnx` | the recogniser (CRNN, input `1x1xHxW`, output `T x B x classes`, CTC) |
 | `fallback.json` | when and how the slow second reader (Qwen) is used |
@@ -18,11 +18,22 @@ Schemas are in `schema/`. The validator is `cardpack.py`.
 ## Rules
 
 - **Integrity.** `manifest.files` holds the sha256 of every file except the manifest. A pack with any mismatch, missing file, extra file, or an unsafe member name (for example `../x`) is rejected before use.
-- **Cross-file consistency.** Field keys must equal the grid's row names. `grid.image_size` must equal the template size times `template.grid_scale`. Grid lines must increase and stay inside the image. Allowed classes must exist in the class list and include the blank class. The reader must load and its output class count must equal the class list.
+- **Cross-file consistency.** Field keys must equal the grid's field names (row names, or column names for `ruled-rows-v1`). `grid.image_size` must equal the template size times `template.grid_scale`. Grid lines must increase and stay inside the image. Allowed classes must exist in the class list and include the blank class. The reader must load and its output class count must equal the class list.
 - **Ship needs evidence.** A field may be `ship` only if `manifest.metrics.heldout.per_field` has an entry for it (held-out count, correct count, 95% interval, from a page-disjoint split). With no held-out evidence every field is `needs-review`.
 - **Unknown card.** `match.min_inliers` is the floor. Below it the app reports an unknown card type and must not read with this pack.
 - **Determinism.** `cardpack.build` writes members sorted, with fixed timestamps, so unpacking and re-packing gives a byte-identical archive.
 - **Privacy.** A template can contain handwriting. Packs stay on local machines and are gitignored (`cardpack/out/`).
+
+## Grid types
+
+A grid is a ruled table: column lines at the top and bottom of the table, and row lines for each column. What differs is which way the fields run.
+
+| `manifest.grid.type` | `grid.json` | a field is | a visit is | example |
+|---|---|---|---|---|
+| `ruled-columns-v1` | `rows` = field keys | a row | a column | ANC, EPI |
+| `ruled-rows-v1` | `axis: "columns"`, `cols` = field keys, `rows` = `r1`, `r2`, ... | a column | a row | NCD (one line per visit) |
+
+Field keys must equal the grid's field names (`rows`, or `cols` for `ruled-rows-v1`). The cell geometry is the same in both. The phone app only reads `ruled-columns-v1` so far.
 
 ## Field kinds
 

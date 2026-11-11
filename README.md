@@ -13,7 +13,7 @@ _Aggregate numbers from the author's own labeled data, updated 2026-11-11. Held-
 | | |
 |---|---|
 | Card types / pack versions | 1 / 4 |
-| Saved templates | 3 |
+| Saved templates | 4 |
 | Labeled cells | 369 on 49 pages |
 | Training runs / experiment records | 2 / 4 |
 | Fields that meet the ship gate | 3 of 22 (anc v6) |
@@ -101,6 +101,6 @@ docs/          screenshots/ (registered in MANIFEST.json), status.json
 - Evidence comes from a small labeled set; most fields have under 40 held-out cells, so differences of a few points are noise.
 - The phone app is not part of this repository. Phone-photo accuracy has not been measured on real labeled phone photos.
 - Any saved template with a grid can take filled scans (`studio/scans.py`, or Filled scans on the Cards tab) and be trained once its cells are labeled, but Studio has no labeling screen for new cards yet: labels go in `studio/cards/<name>/labels.csv` by hand. Only the ANC card has a labeler. Match and preprocessing settings in a new card's pack are the ANC values, untuned.
-- The grid format describes named field rows crossed with visit columns. A card laid out the other way (one row per visit, one column per field) cannot be described yet.
+- A grid can run either way: one field per row with a column per visit (`ruled-columns-v1`), or one visit per row with a column per field (`ruled-rows-v1`). Studio cuts, trains and packs both; the phone app only reads the first so far.
 - A template should come from the same kind of capture as the scans it will match: a colour phone photo used as the template did not match photocopied scans of the same card.
 - License: not chosen yet. Until the maintainers add a `LICENSE` file, all rights are reserved.

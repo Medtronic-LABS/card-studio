@@ -110,6 +110,49 @@ class Cut(Base):
         self.assertEqual(scans.summary("alpha")["totals"]["labeled"], cards.MIN_PAGES)
 
 
+class VisitRows(Base):
+    """A card with one row per visit: the field is the column, and visit cN is the N-th row."""
+    def test_cells_are_keyed_by_column_field_and_row_visit(self):
+        d = cards.TEMPLATES / "alpha" / "v1"; layout = self.card["alpha"][1]
+        g, _ = gridconv.layout_to_grid(layout, label_cols=1, axis="columns"); (d / "grid.json").write_text(json.dumps(g)); scans._targets.clear()
+        self.assertEqual((g["cols"], len(g["rows"])), (["col_01", "col_02", "col_03"], ROWS))
+        r = scans.add("alpha", self.scan("alpha", cells=((0, 0), (4, 2))), "p-001.png")[0]            # written in (row 1, col 1) and (row 5, col 3)
+        self.assertEqual((r["status"], r["cells"], r["with_ink"]), ("ok", ROWS * COLS, 2))
+        cells = scans._read("alpha", "cells.csv", scans.CELL_COLS)
+        self.assertEqual({(c["row"], c["col"]) for c in cells if c["ink"] == "1"}, {("col_01", "c1"), ("col_03", "c5")})
+        self.assertEqual(sorted(p.name for p in cards.crops_dir("alpha").iterdir()), ["col_01", "col_02", "col_03"])
+        self.assertEqual(scans.summary("alpha")["grid"]["axis"], "columns")
+
+
+class PrintInsideCells(Base):
+    """A printed diagonal in every cell of one column (as in a blood-pressure cell) is not handwriting."""
+    def setUp(self):
+        super().setUp(); img, layout = self.card["alpha"]; data = [f for f in layout["fields"] if f["x"] >= 180]
+        for r in range(ROWS):
+            f = data[r * COLS + 1]; cv2.line(img, (f["x"], f["y"] + f["h"]), (f["x"] + f["w"], f["y"]), 0, 2)
+        cv2.imwrite(str(cards.TEMPLATES / "alpha" / "v1" / "template.png"), img); scans._targets.clear()
+
+    def ink(self):
+        return {(c["page"], c["row"], c["col"]) for c in scans._read("alpha", "cells.csv", scans.CELL_COLS) if c["ink"] == "1"}
+
+    def test_print_counts_as_ink_until_there_are_enough_scans_to_know_the_blank_card(self):
+        for i in range(scans.BLANK_MIN - 1): scans.add("alpha", self.scan("alpha", cells=((i % ROWS, 0),), seed=i), f"p-{i:03d}.png")
+        s = scans.summary("alpha"); self.assertFalse(s["blank_card"])
+        self.assertEqual(s["totals"]["with_ink"], (scans.BLANK_MIN - 1) * (ROWS + 1))                 # every diagonal cell, plus the one written cell
+        i = scans.BLANK_MIN - 1; scans.add("alpha", self.scan("alpha", cells=((2, 1), (3, 2)), seed=i), f"p-{i:03d}.png")   # one of these is written across a diagonal
+        s = scans.summary("alpha"); self.assertTrue(s["blank_card"]); rows = [f"f1_{r}" for r in range(ROWS)]
+        want = {(f"p-{k:03d}", rows[k % ROWS], "c1") for k in range(scans.BLANK_MIN - 1)} | {(f"p-{i:03d}", rows[2], "c2"), (f"p-{i:03d}", rows[3], "c3")}
+        self.assertEqual(self.ink(), want); self.assertEqual(s["totals"]["with_ink"], len(want))
+        r = scans.add("alpha", self.scan("alpha", cells=((0, 1),), seed=99), "late.png")[0]              # a scan added later is judged against the blank card straight away
+        self.assertEqual(r["with_ink"], 1)
+
+    def test_estimate_goes_away_when_scans_are_removed(self):
+        for i in range(scans.BLANK_MIN): scans.add("alpha", self.scan("alpha", cells=(), seed=i), f"p-{i:03d}.png")
+        self.assertEqual(scans.summary("alpha")["totals"]["with_ink"], 0)
+        scans.remove("alpha", "p-000"); s = scans.summary("alpha")
+        self.assertFalse(s["blank_card"]); self.assertEqual(s["totals"]["with_ink"], (scans.BLANK_MIN - 1) * ROWS)
+
+
 class Lifecycle(Base):
     def test_recut_after_a_grid_edit_and_stale_after_a_new_template_image(self):
         scans.add("alpha", self.scan("alpha"), "p-001.png")

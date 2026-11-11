@@ -119,7 +119,11 @@
           "const": "grid.json"
         },
         "type": {
-          "const": "ruled-columns-v1"
+          "enum": [
+            "ruled-columns-v1",
+            "ruled-rows-v1"
+          ],
+          "description": "ruled-columns-v1: fields are grid rows, visits are columns. ruled-rows-v1: fields are grid columns (grid.json has axis columns and cols), visits are rows"
         },
         "cell_margin": {
           "type": "integer",

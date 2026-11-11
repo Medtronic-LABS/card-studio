@@ -153,8 +153,14 @@ def validate(path, check_reader=True) -> list:
     keys = [f["key"] for f in fld["fields"]]
     if len(set(keys)) != len(keys):
         errs.append("fields: duplicate field keys")
-    if set(keys) != set(grid["rows"]):
-        errs.append(f"fields keys and grid rows differ: only in fields {sorted(set(keys) - set(grid['rows']))}, only in grid {sorted(set(grid['rows']) - set(keys))}")
+    by_col = grid.get("axis", "rows") == "columns"
+    if (man["grid"]["type"] == "ruled-rows-v1") != by_col:
+        errs.append(f"manifest grid type {man['grid']['type']} does not agree with grid axis {grid.get('axis', 'rows')!r} (ruled-rows-v1 goes with axis columns)")
+    if by_col and (len(grid.get("cols") or []) != ncols or len(set(grid.get("cols") or [])) != ncols):
+        errs.append(f"grid: axis columns needs {ncols} unique names in cols")
+    names = (grid.get("cols") or []) if by_col else grid["rows"]
+    if set(keys) != set(names):
+        errs.append(f"fields keys and grid {'cols' if by_col else 'rows'} differ: only in fields {sorted(set(keys) - set(names))}, only in grid {sorted(set(names) - set(keys))}")
     held = (man["metrics"].get("heldout") or {}).get("per_field", {})
     for f in fld["fields"]:
         k = f["key"]

@@ -6,7 +6,7 @@ HERE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE)); sys.path.insert(0, str(HERE.parent / "cardpack"))
 import cards, corrections, gridconv, server
 import cardpack as cp
-from test_gridconv import table
+from test_gridconv import table, visit_table
 
 ROWS = ["weight", "seen", "bp", "visit", "note", "row_06"]
 
@@ -101,6 +101,23 @@ class Pack(Base):
         self.assertEqual((f["weight"]["range"], f["seen"]["valid_values"], f["bp"]["bp"]["sys_above_dia"], f["note"]["kind"]), ([30, 150], ["y", "x", "-"], True, "text"))
         self.assertTrue(all(x["status"] == "needs-review" for x in f.values()))
 
+    def test_a_card_with_one_row_per_visit_gets_a_ruled_rows_pack(self):
+        layout = visit_table(); W, H = layout["image"]; d = cards.TEMPLATES / "visits" / "v1"; d.mkdir(parents=True)
+        cv2.imwrite(str(d / "template.png"), np.full((H, W, 3), 240, np.uint8))
+        g, _ = gridconv.layout_to_grid(layout, axis="columns", label_rows=1); (d / "grid.json").write_text(json.dumps(g))
+        (cards.CARDS / "visits").mkdir(parents=True); (cards.CARDS / "visits" / "fields.json").write_text(json.dumps({"fields": {"date": {"kind": "date"}, "bp": {"kind": "bp"}, "weight": {"kind": "number"}}}))
+        self.assertEqual([(f["key"], f["kind"]) for f in cards.fields("visits")], [("date", "date"), ("bp", "bp"), ("weight", "number"), ("note", "text")])
+        self.assertEqual(cards.describe("visits")["grid"], {"rows": 5, "cols": 4, "axis": "columns", "fields": 4, "visits": 5})
+        mem = cards.base_members("visits"); man = json.loads(mem["manifest.json"]); grid = json.loads(mem["grid.json"])
+        self.assertEqual((man["grid"]["type"], grid["axis"], grid["cols"]), ("ruled-rows-v1", "columns", ["date", "bp", "weight", "note"]))
+        def packed(man, grid):
+            m = dict(mem); m["reader.onnx"] = b"placeholder"; m["grid.json"] = json.dumps(grid).encode()
+            man = {**man, "version": 1}; man["files"] = {n: cp.sha256(m[n]) for n in cp.HASHED}; m["manifest.json"] = json.dumps(man).encode()
+            out = cards.PACKS / "visits_v1.cardpack"; cp.build(m, out); return cp.validate(out, check_reader=False)
+        self.assertEqual(packed(man, grid), [])
+        self.assertTrue(any("does not agree" in e for e in packed({**man, "grid": {**man["grid"], "type": "ruled-columns-v1"}}, grid)))
+        self.assertTrue(any("cols" in e for e in packed(man, {**grid, "cols": grid["cols"][:-1]})))
+
     def test_names_that_cannot_be_pack_ids(self):
         self.template("_odd")
         with self.assertRaises(ValueError): cards.base_members("_odd")
@@ -114,7 +131,7 @@ class Readiness(Base):
         self.assertIn("0 labeled page", cards.describe("demo")["blocker"])
         self.label([(f"p-{i:03d}", "weight", "c1", "57") for i in range(cards.MIN_PAGES)])
         d = cards.describe("demo")
-        self.assertEqual((d["trainable"], d["blocker"], d["labels"], d["grid"]), (True, "", {"cells": cards.MIN_PAGES, "pages": cards.MIN_PAGES}, {"rows": 6, "cols": 3}))
+        self.assertEqual((d["trainable"], d["blocker"], d["labels"], d["grid"]), (True, "", {"cells": cards.MIN_PAGES, "pages": cards.MIN_PAGES}, {"rows": 6, "cols": 3, "axis": "rows", "fields": 6, "visits": 3}))
         self.assertEqual([c["id"] for c in cards.list_cards()], ["anc", "demo", "nogrid"])
 
     def test_server_refuses_to_train_a_card_that_is_not_ready(self):

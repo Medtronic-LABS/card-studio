@@ -4,9 +4,14 @@ The steps are the ones the phone path uses (cleanup.py: SIFT + RANSAC align with
 the pack margin), so a crop the reader is trained on is cut the way a crop it will read is cut. Crops are stored as cut: gray, no line
 removal, no page clean-up (the same as the ANC training crops). Results go to studio/cards/<card>/ (patient data, gitignored):
     aligned/<page>.png             the scan on the template, at the grid's resolution
-    crops/<row>/<col>/<page>.png   one image per grid cell
+    crops/<field>/<visit>/<page>.png   one image per grid cell (visit = c1..cN: a column, or a row on a card whose fields run down the columns)
     scans.csv                      one row per scan: source file name, content hash, inliers, status, template version, grid hash
     cells.csv                      one row per cut cell: does it hold ink (the pack's ink gate, after line removal)
+    blank.png                      the card with nothing written on it: the pixel median of up to BLANK_SCANS aligned scans
+
+What is printed inside a cell (a diagonal that splits a blood-pressure cell, a dotted line, shading) is not handwriting. Once a card has
+BLANK_MIN scans, the blank card is estimated from them and anything it already shows is ignored when deciding whether a cell holds ink.
+With fewer scans there is no estimate, and a cell with print in it counts as having ink.
 
 A scan is `ok`, or `check` when it matched with fewer than CHECK_BELOW inliers (look at it before trusting its cells). A scan that does not
 match is not stored. Adding the same file again replaces its earlier result. If the grid is edited, `recut` cuts every stored scan again
@@ -27,6 +32,7 @@ from idtest import _sift
 AUTO = "auto"
 MIN_INLIERS, CHECK_BELOW, MARGIN = 40, 100, 2.0     # floor (the packs' match.min_inliers); below CHECK_BELOW a person should look; auto: best must beat the runner-up by MARGIN
 MAX_SIDE, MAX_PDF_PAGES, PDF_DPI = 3000, 200, 200
+BLANK_MIN, BLANK_SCANS, PRINT_BELOW = 5, 25, 170      # scans needed for / used in the blank-card estimate; blank-card pixels darker than this are print
 EXT = {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".heic", ".heif", ".pdf"}
 SCAN_COLS = ["page", "source", "sha256", "inliers", "status", "template_version", "grid_sha", "cells", "with_ink", "added"]
 CELL_COLS = ["page", "row", "col", "ink"]
@@ -102,12 +108,34 @@ def _write(card, name, cols, rows):
         w = csv.DictWriter(fh, cols); w.writeheader(); w.writerows(rows)
 
 
+def _visit(t, ri, c):
+    return f"c{(ri if t.grid.get('axis') == 'columns' else c) + 1}"        # a visit is a column, or a row when the fields run down the columns
+
+
+def _blank(t):
+    """The estimated blank card (see the module text), or None when there is none yet or it is for another image size."""
+    p = cards.CARDS / t.card / "blank.png"; im = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE) if p.exists() else None
+    return im if im is not None and [im.shape[1], im.shape[0]] == t.grid["image_size"] else None
+
+
+def _blank_cells(t, blank):
+    return {} if blank is None else {(field, _visit(t, ri, c)): crop for ri, c, field, crop in cleanup.cut_cells(blank, t, "none")}
+
+
+def _has_ink(t, crop, blank_crop=None):
+    if blank_crop is not None and blank_crop.shape == crop.shape:
+        printed = cv2.dilate((blank_crop < PRINT_BELOW).astype(np.uint8), np.ones((7, 7), np.uint8))      # widened a little: scans never align to the pixel
+        crop = np.where(printed > 0, 255, crop).astype(np.uint8)
+    return cleanup.prepare(cleanup.remove_lines(crop), t) is not None
+
+
 def _cut(t, page, aligned):
     """Write every cell crop of one aligned scan. -> cells.csv rows."""
-    root = cards.crops_dir(t.card); cols = len(t.grid["col_lines_top"]) - 1; out = []
+    root = cards.crops_dir(t.card); cols = len(t.grid["col_lines_top"]) - 1; out = []; bl = _blank_cells(t, _blank(t))
     for ri, c, field, crop in cleanup.cut_cells(aligned, t, "none"):
-        f = root / field / f"c{c + 1}" / f"{page}.png"; f.parent.mkdir(parents=True, exist_ok=True); cv2.imwrite(str(f), crop)
-        out.append({"page": page, "row": field, "col": f"c{c + 1}", "ink": int(cleanup.prepare(cleanup.remove_lines(crop), t) is not None)})
+        visit = _visit(t, ri, c)
+        f = root / field / visit / f"{page}.png"; f.parent.mkdir(parents=True, exist_ok=True); cv2.imwrite(str(f), crop)
+        out.append({"page": page, "row": field, "col": visit, "ink": int(_has_ink(t, crop, bl.get((field, visit))))})
     assert len(out) == len(t.grid["rows"]) * cols
     return out
 
@@ -158,6 +186,36 @@ def add(card, data: bytes, source="scan"):
     return out
 
 
+def refresh_ink(card):
+    """Rebuild the blank-card estimate when the scans it should come from have changed, then decide again which cells hold ink.
+    -> True when something was rebuilt. Cheap when nothing changed, so summary() calls it."""
+    t = target(card); d = cards.CARDS / card
+    with _lock:
+        rows = _read(card, "scans.csv", SCAN_COLS)
+        use = [r for r in rows if r["status"] == "ok" and str(r["template_version"]) == str(t.version)][:BLANK_SCANS]
+        key = hashlib.sha256("|".join(r["sha256"] for r in use).encode()).hexdigest()[:16] if len(use) >= BLANK_MIN else None
+        try: have = json.loads((d / "blank.json").read_text())["key"]
+        except (OSError, ValueError, KeyError): have = None
+        if key == have: return False
+        if key is None:
+            (d / "blank.png").unlink(missing_ok=True); (d / "blank.json").unlink(missing_ok=True)
+        else:
+            stack = [im for im in (cv2.imread(str(cards.aligned_dir(card) / f"{r['page']}.png"), cv2.IMREAD_GRAYSCALE) for r in use)
+                     if im is not None and [im.shape[1], im.shape[0]] == t.grid["image_size"]]
+            if len(stack) < BLANK_MIN: return False
+            cv2.imwrite(str(d / "blank.png"), np.median(np.stack(stack), axis=0).astype(np.uint8))
+            (d / "blank.json").write_text(json.dumps({"key": key, "scans": len(stack)}))
+        bl = _blank_cells(t, _blank(t)); cells = _read(card, "cells.csv", CELL_COLS); per = {}
+        for c in cells:
+            crop = cv2.imread(str(cards.crops_dir(card) / c["row"] / c["col"] / f"{c['page']}.png"), cv2.IMREAD_GRAYSCALE)
+            if crop is not None: c["ink"] = int(_has_ink(t, crop, bl.get((c["row"], c["col"]))))
+            per[c["page"]] = per.get(c["page"], 0) + int(c["ink"])
+        for r in rows:
+            if r["page"] in per: r["with_ink"] = per[r["page"]]
+        _write(card, "scans.csv", SCAN_COLS, rows); _write(card, "cells.csv", CELL_COLS, cells)
+    return True
+
+
 def recut(card):
     """Cut every stored scan again with the grid as it is now. Scans aligned to an older template image are marked stale and their crops removed."""
     t = target(card)
@@ -171,6 +229,7 @@ def recut(card):
             c = _cut(t, r["page"], im); cells += c; done += 1
             r["grid_sha"] = t.grid_sha; r["cells"] = len(c); r["with_ink"] = sum(x["ink"] for x in c)
         _write(card, "scans.csv", SCAN_COLS, rows); _write(card, "cells.csv", CELL_COLS, cells)
+    refresh_ink(card)
     return {"card": card, "recut": done, "stale": stale}
 
 
@@ -187,15 +246,17 @@ def remove(card, page):
 
 
 def summary(card):
+    refresh_ink(card)
     t = target(card); rows = _read(card, "scans.csv", SCAN_COLS)
     for r in rows:
         if r["status"] != "stale" and str(r["template_version"]) != str(t.version): r["status"] = "stale"
     live = [r for r in rows if r["status"] != "stale"]
     labeled = len(cards.labels(card)[0])
-    return {"card": card, "template_version": t.version, "grid": {"rows": len(t.grid["rows"]), "cols": len(t.grid["col_lines_top"]) - 1, "size": t.grid["image_size"]},
+    return {"card": card, "template_version": t.version, "grid": {**cards.grid_shape(t.grid), "size": t.grid["image_size"]},
             "scans": [{k: (int(r[k]) if k in ("inliers", "cells", "with_ink") and str(r[k]).isdigit() else r[k]) for k in SCAN_COLS if k != "sha256"} for r in rows],
             "totals": {"scans": len(rows), "ok": sum(r["status"] == "ok" for r in rows), "check": sum(r["status"] == "check" for r in rows),
                        "stale": len(rows) - len(live), "cells": sum(int(r["cells"] or 0) for r in live), "with_ink": sum(int(r["with_ink"] or 0) for r in live), "labeled": labeled},
+            "blank_card": (cards.CARDS / card / "blank.json").exists(),
             "needs_recut": sum(r["grid_sha"] != t.grid_sha for r in live)}
 
 

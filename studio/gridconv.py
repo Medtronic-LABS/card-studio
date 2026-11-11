@@ -1,13 +1,20 @@
-"""Studio layout (free rectangles from detect.py / the editor) -> cardpack `ruled-columns-v1` grid.
+"""Studio layout (free rectangles from detect.py / the editor) -> cardpack grid (`ruled-columns-v1` or `ruled-rows-v1`).
 
-A Studio layout is a list of cell rectangles. A pack grid is a table: named rows x visit columns, with column lines at
-the top and bottom of the table and row lines per column (so a slightly skewed card is still described). This module
-finds the table in the rectangles and writes that description. Pure Python, no OpenCV.
+A Studio layout is a list of cell rectangles. A pack grid is a table, with column lines at the top and bottom of the table
+and row lines per column (so a slightly skewed card is still described). This module finds the table in the rectangles and
+writes that description. Pure Python, no OpenCV.
+
+A card puts its fields on one axis and its visits on the other:
+- axis "rows" (`ruled-columns-v1`, the ANC and EPI cards): each row is a field (weight, pulse, ...), each column is a visit;
+- axis "columns" (`ruled-rows-v1`, the NCD card): each column is a field, each row is a visit. The grid then also carries
+  `axis: "columns"` and `cols` (the field names); `rows` are just r1, r2, ...
 
 Assumptions (stated so they can be checked, not hidden):
 - the card is a ruled table, rows are horizontal bands, columns are vertical bands;
-- `label_cols` leading columns are printed labels and `data_cols` columns after them are the visits;
-- a cell left of the data columns that the user renamed (e.g. `weight_kg`) names its row, otherwise rows are row_01...
+- `label_cols` leading columns are printed labels and `data_cols` columns after them are kept; `label_rows` leading rows
+  (printed column headings that have ruled lines of their own) are skipped and `data_rows` rows after them are kept;
+- axis "rows": a cell left of the data columns that the user renamed (e.g. `weight_kg`) names its row, otherwise rows are row_01...
+- axis "columns": a renamed cell above the data rows names its column, otherwise columns are col_01...
 """
 import re
 from statistics import median
@@ -43,14 +50,25 @@ def _near(vals, target, tol):
     return median(close) if close else target
 
 
-def layout_to_grid(layout, label_cols=0, data_cols=None, scale=1.0):
+AXES = ("rows", "columns")
+
+
+def field_names(grid):
+    """The field keys of a grid: its row names, or its column names when the fields run down the columns."""
+    return grid["cols"] if grid.get("axis") == "columns" else grid["rows"]
+
+
+def layout_to_grid(layout, label_cols=0, data_cols=None, scale=1.0, axis="rows", label_rows=0, data_rows=None):
     """Returns (grid, warnings). Raises ValueError when no table can be found.
 
     Column lines are the x positions where many cells start or end; row lines are the y positions where cells in the
     chosen columns start or end (a line is the bottom of the cell above and the top of the cell below, so it is voted
     for twice per column). This tolerates merged cells and rows that detect.py split differently per column.
     label_cols: leading columns to skip (printed row labels). data_cols: keep only this many columns after that.
+    label_rows / data_rows: the same for rows (printed headings at the top). axis: which way the fields run (see the module text).
     """
+    if axis not in AXES:
+        raise ValueError(f"axis must be one of {AXES}")
     cells = _cells(layout)
     if len(cells) < 4:
         raise ValueError("too few cells to form a table")
@@ -74,14 +92,27 @@ def layout_to_grid(layout, label_cols=0, data_cols=None, scale=1.0):
     yl = [median(c) for c in ye if len(c) >= max(2, round(LINE_VOTE * len(cols)))]
     if len(yl) < 3:
         raise ValueError("no horizontal row lines found in the data columns")
+    yl = yl[label_rows:]
+    if data_rows:
+        yl = yl[:data_rows + 1]
+    if len(yl) < 2:
+        raise ValueError("no data rows left after label_rows/data_rows")
     nrows = len(yl) - 1
-    # row names: a renamed cell to the left of the data columns, else row_01...
-    left = [c for c in cells if c["x"] + c["w"] / 2 < x0 and ROWNAME.match(c["name"]) and not DEFAULT.match(c["name"])]
-    names, seen = [], set()
-    for i in range(nrows):
-        hit = [c["name"] for c in left if yl[i] <= c["y"] + c["h"] / 2 <= yl[i + 1] and c["name"] not in seen]
-        nm = hit[0] if hit else f"row_{i + 1:02d}"
-        names.append(nm); seen.add(nm)
+    named = [c for c in cells if ROWNAME.match(c["name"]) and not DEFAULT.match(c["name"])]
+    names, colnames, seen = [], None, set()
+    if axis == "rows":      # row names: a renamed cell to the left of the data columns, else row_01...
+        left = [c for c in named if c["x"] + c["w"] / 2 < x0]
+        for i in range(nrows):
+            hit = [c["name"] for c in left if yl[i] <= c["y"] + c["h"] / 2 <= yl[i + 1] and c["name"] not in seen]
+            nm = hit[0] if hit else f"row_{i + 1:02d}"
+            names.append(nm); seen.add(nm)
+    else:                   # column names: a renamed cell above the data rows (the lowest one, nearest the data), else col_01...
+        above = sorted((c for c in named if c["y"] + c["h"] / 2 < yl[0]), key=lambda c: -c["y"])
+        names, colnames = [f"r{i + 1}" for i in range(nrows)], []
+        for i, (xa, xb) in enumerate(cols):
+            hit = [c["name"] for c in above if xa <= c["x"] + c["w"] / 2 <= xb and c["name"] not in seen]
+            nm = hit[0] if hit else f"col_{i + 1:02d}"
+            colnames.append(nm); seen.add(nm)
     # row lines per column (follows a skewed card): this column's own edges near each global line, within
     # almost half a row so a line is never matched to its neighbour
     NEAR_TOL = max(NEAR_TOL, 0.45 * median(b - a for a, b in zip(yl, yl[1:])))
@@ -108,6 +139,8 @@ def layout_to_grid(layout, label_cols=0, data_cols=None, scale=1.0):
             "y_ref_top": f(rl[0][0]), "y_ref_bot": f(rl[0][-1]),
             "col_lines_top": [f(v) for v in top], "col_lines_bot": [f(v) for v in bot],
             "row_lines_by_col": [[f(v) for v in col] for col in rl]}
+    if axis == "columns":
+        grid["axis"], grid["cols"] = "columns", colnames
     thin = [i + 1 for i in range(nrows) if yl[i + 1] - yl[i] < 8]
     if thin:
         warnings.append(f"row(s) {thin} are under 8 px tall: probably a spurious line")
@@ -120,6 +153,11 @@ def check_grid(grid):
     inc = lambda a: all(b > c for c, b in zip(a, a[1:]))
     nrows, ncols = len(grid["rows"]), len(grid["col_lines_top"]) - 1
     if len(set(grid["rows"])) != nrows: errs.append("row names must be unique")
+    if grid.get("axis", "rows") not in AXES: errs.append(f"axis must be one of {AXES}")
+    if grid.get("axis") == "columns":
+        cn = grid.get("cols") or []
+        if len(cn) != ncols or len(set(cn)) != ncols or not all(isinstance(c, str) and ROWNAME.match(c) for c in cn): errs.append(f"cols must be {ncols} unique field names")
+    elif "cols" in grid: errs.append("cols is only for axis columns")
     if len(grid["col_lines_bot"]) != ncols + 1: errs.append("col_lines_top and col_lines_bot differ in length")
     if not inc(grid["col_lines_top"]) or not inc(grid["col_lines_bot"]): errs.append("column lines must increase left to right")
     if len(grid["row_lines_by_col"]) != ncols: errs.append("row_lines_by_col has the wrong number of columns")

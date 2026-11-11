@@ -122,11 +122,13 @@ def prepare(gray, pack):
 
 
 def cut_cells(card, pack, method):
-    """Yield (row_index, col_index, field, crop) like AncAligner.cells."""
-    g = pack.grid; m = pack.margin; H, W = card.shape
+    """Yield (row_index, col_index, field, crop) like AncAligner.cells. The field is the row's name, or the column's when the grid's
+    fields run down the columns (axis "columns": each row is then a visit)."""
+    g = pack.grid; m = pack.margin; H, W = card.shape; by_col = g.get("axis") == "columns"
     for c in range(len(g["col_lines_top"]) - 1):
         rl = g["row_lines_by_col"][c]
-        for ri, field in enumerate(g["rows"]):
+        for ri, row in enumerate(g["rows"]):
+            field = g["cols"][c] if by_col else row
             ymid = (rl[ri] + rl[ri + 1]) / 2.0
             xa = _xat(g["col_lines_top"][c], g["col_lines_bot"][c], ymid, g) - m
             xb = _xat(g["col_lines_top"][c + 1], g["col_lines_bot"][c + 1], ymid, g) + m
@@ -202,7 +204,7 @@ def analyze(photo, out_dir, pack=None, packs=None, methods=N.METHODS, preview_wi
             vals = {m: all_reads[m][(ri, c)] for m in done}
             texts = {v[0] for v in vals.values()}
             if len(texts) > 1:
-                diff.append({"field": rows[ri], "visit": c + 1, "reads": {m: {"text": v[0], "confidence": round(v[1], 2), "flagged": v[2]} for m, v in vals.items()}})
+                diff.append({"field": g["cols"][c] if g.get("axis") == "columns" else rows[ri], "visit": (ri if g.get("axis") == "columns" else c) + 1, "reads": {m: {"text": v[0], "confidence": round(v[1], 2), "flagged": v[2]} for m, v in vals.items()}})
     return {"id": uid, "pack": pack.name, "pack_default": pack.default, "inliers": inl, "covered_percent": round(100.0 * float((covered != 0).mean()), 1),
             "methods": results, "disagreements": diff, "cells_total": len(rows) * ncol,
             "notes": ["No ground truth for an uploaded photo: compare the reads with the card by eye.",
