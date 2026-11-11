@@ -59,7 +59,7 @@ _Aggregate numbers from the author's own labeled data, updated 2026-11-11. Held-
 | **Training recipe** (`work_phaseA/`) | CRNN + CTC reader (about 538k parameters), page-level splits, field-masked decoding, Wilson intervals. |
 | **Tools** (`tools/`) | The leak check, screenshot capture, README generator and publish script. |
 
-Studio tabs: **Dashboard** (model registry, getting started, activity, what needs attention), **Label** (set each field's kind, then type what each cut cell says, one cell at a time from the keyboard; import corrected labels), **Train & Ship** (held-out gate per field), **History** (runs, paired comparison, experiments), **Model quality** (failure browser, calibration, risk-coverage, confusions, flag-policy tuner, provenance), **Clean-up lab** (try each photo clean-up on one photo).
+Studio tabs: **Dashboard** (model registry, getting started, activity, what needs attention), **Label** (set each field's kind, then type what each cut cell says, one cell at a time from the keyboard; optionally send the cells to a local [Label Studio](https://labelstud.io) and pull its labels back; import corrected labels), **Train & Ship** (held-out gate per field), **History** (runs, paired comparison, experiments), **Model quality** (failure browser, calibration, risk-coverage, confusions, flag-policy tuner, provenance), **Clean-up lab** (try each photo clean-up on one photo).
 
 ## How "good" is decided
 

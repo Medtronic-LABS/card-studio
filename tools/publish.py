@@ -22,6 +22,9 @@ studio/runs/
 studio/uploads/
 studio/templates/
 studio/cards/
+studio/.venv-labelstudio/
+studio/labelstudio.json
+studio/labelstudio-data/
 studio/imports/
 studio/experiments/
 cardpack/out/
