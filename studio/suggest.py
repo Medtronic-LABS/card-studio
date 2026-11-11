@@ -72,7 +72,8 @@ def make(card):
     if pack_path is None: raise ValueError("no trained reader in cardpack/out yet: label some cells by hand and train once, then suggestions can start")
     pk = cleanup.load_pack(pack_path); r = pk.man["reader"]["input"]; h, w = r["height"], r["width"]; t0 = time.time()
     masks = cards.masks(card); kinds = {f["key"]: f["kind"] for f in cards.fields(card)}
-    todo = [k for k, ink in labeling._cells(card).items() if ink and k[1] in masks and (own or kinds[k[1]] != "text")]
+    layouts = {f["key"]: f["layout"] for f in cards.fields(card)}
+    todo = [k for k, ink in labeling._cells(card).items() if ink and k[1] in masks and (own or kinds[k[1]] != "text") and layouts[k[1]] == "single"]       # two-line cells are not suggested: the whole-cell reader cannot read them
     rows = []
     for i in range(0, len(todo), BATCH):
         chunk = [(k, _input(cards.crops_dir(card) / k[1] / k[2] / f"{k[0]}.png", h, w)) for k in todo[i:i + BATCH]]
@@ -87,4 +88,4 @@ def make(card):
         wr = csv.DictWriter(fh, COLS); wr.writeheader(); wr.writerows(rows)
     tmp.replace(d / "suggestions.csv")
     return {"card": card, "reader": pk.name, "own_reader": own, "cells": len(rows),
-            "skipped_text_fields": sorted(k for k, v in kinds.items() if v == "text") if not own else [], "seconds": round(time.time() - t0, 1)}
+            "skipped_text_fields": sorted(k for k, v in kinds.items() if v == "text") if not own else [], "skipped_two_line_fields": sorted(k for k, v in layouts.items() if v != "single"), "seconds": round(time.time() - t0, 1)}

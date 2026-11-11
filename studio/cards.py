@@ -7,7 +7,10 @@ studio/cards/<name>/ (patient data: gitignored):
     crops/<row>/<col>/<page>.png   the cell image, same layout as work/crops
     aligned/<page>.png             scans warped onto the template at the grid's resolution (scans.py writes these and the crops)
     scans.csv, cells.csv           what scans.py recorded per scan and per cut cell (which cells have ink)
-    fields.json                    optional, {"fields": {"<row>": {"kind": "number", "range": [30, 150]}}}; a row not listed is `text`
+    writers.csv                    page, writer: who wrote each card, as a code (W07, a clinic id), never a name. Used to keep every card of one
+                                   writer on one side of a train/test split (anc: work/writers.csv)
+    fields.json                    optional, {"fields": {"<field>": {"kind": "number", "range": [30, 150], "layout": "single"}}}; a field not listed is `text`.
+                                   layout (subcells.py): `stacked` for a date written on two lines, `diagonal` for a blood pressure split by a printed diagonal
 
 A cell is always keyed (field, visit). On most cards a field is a grid row and a visit is a grid column; on a card whose grid says
 axis "columns" (one row per visit, like the NCD card) the field is the column and visit cN is the N-th row. Files keep the names row / col.
@@ -15,6 +18,8 @@ axis "columns" (one row per visit, like the NCD card) the field is the column an
 All cards share one class list (model_meta.json) and one pretrained reader; a card only chooses which classes each field may emit."""
 import csv, json, re, time
 from pathlib import Path
+
+import subcells
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -25,6 +30,8 @@ NAME = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
 PACK_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 COL = re.compile(r"^c[1-9][0-9]?$")
 PAGE = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
+WRITER = re.compile(r"^[A-Za-z0-9_-]{1,24}$")
+MIN_WRITER_UNITS = 5     # a writer-disjoint 5-fold split needs at least this many writers
 KINDS = ("number", "date", "bp", "mark", "text")
 KIND_CHARS = {"number": "-.0123456789", "date": "-./0123456789", "bp": "/0123456789", "mark": "-xy"}   # text = every class
 META_KIND = {"numeric": "number", "date": "date", "bp": "bp", "mark": "mark", "text": "text"}
@@ -90,9 +97,9 @@ def pack_versions(card):
 
 
 def fields(card):
-    """[{key, kind, range}] in grid order (rows, or columns when the grid's fields run down the columns). `anc`: every field in model_meta.json."""
+    """[{key, kind, range, layout}] in grid order (rows, or columns when the grid's fields run down the columns). `anc`: every field in model_meta.json."""
     if card == LEGACY:
-        return [{"key": k, "kind": META_KIND[v["type"]], "range": None} for k, v in meta()["fields"].items()]
+        return [{"key": k, "kind": META_KIND[v["type"]], "range": None, "layout": "single"} for k, v in meta()["fields"].items()]
     import gridconv
     rows = gridconv.field_names(json.loads((template_dir(card) / "grid.json").read_text()))
     fp = CARDS / card / "fields.json"
@@ -102,12 +109,14 @@ def fields(card):
         raise ValueError(f"fields.json names fields that are not in the grid: {', '.join(unknown)}")
     out = []
     for r in rows:
-        s = spec.get(r, {}); kind = s.get("kind", "text"); rng = s.get("range")
+        s = spec.get(r, {}); kind = s.get("kind", "text"); rng = s.get("range"); layout = s.get("layout", "single")
         if kind not in KINDS:
             raise ValueError(f"{r}: unknown field kind {kind!r}")
         if rng is not None and (kind != "number" or len(rng) != 2 or not rng[0] < rng[1]):
             raise ValueError(f"{r}: range needs kind number and [low, high]")
-        out.append({"key": r, "kind": kind, "range": rng})
+        try: subcells.check_layout(kind, layout)
+        except ValueError as e: raise ValueError(f"{r}: {e}")
+        out.append({"key": r, "kind": kind, "range": rng, "layout": layout})
     return out
 
 
@@ -116,7 +125,12 @@ def masks(card):
     m = meta()
     if card == LEGACY:
         return {k: sorted(v["allowed_idx"]) for k, v in m["fields"].items()}
-    return {f["key"]: allowed_idx(f["kind"], m["classes"], m["blank_idx"]) for f in fields(card)}
+    out = {}
+    for f in fields(card):
+        out[f["key"]] = allowed_idx(f["kind"], m["classes"], m["blank_idx"])
+        if f["layout"] != "single":        # the pieces a two-line cell is read as have tighter masks of their own
+            for suffix, idx in subcells.piece_masks(f["layout"], m["classes"], m["blank_idx"]).items(): out[f["key"] + suffix] = idx
+    return out
 
 
 def crops_dir(card):
@@ -171,11 +185,12 @@ def labels(card):
     return rows, {k: v for k, v in bad.items() if v}
 
 
-def pack_field(key, kind, rng, classes, blank, reason="not trained yet"):
+def pack_field(key, kind, rng, classes, blank, reason="not trained yet", layout="single"):
     e = {"key": key, "kind": kind, "allowed_idx": allowed_idx(kind, classes, blank), "range": list(rng) if rng and kind == "number" else None,
          "min_confidence": 0.5 if kind == "mark" else 0.7, "status": "needs-review", "status_reason": reason}
     if kind == "bp": e["bp"] = {"sys": [70, 220], "dia": [40, 130], "sys_above_dia": True}
     if kind == "mark": e["valid_values"] = ["y", "x", "-"]
+    if layout != "single": e["layout"] = layout
     return e
 
 
@@ -198,7 +213,7 @@ def base_members(card):
     if json.loads((d / "grid.json").read_text())["image_size"] != [tw, th]:
         raise ValueError(f"grid is for a different image size than the template ({[tw, th]}): save the grid again")
     grid, scale = pack_grid(card)
-    fld = [pack_field(f["key"], f["kind"], f["range"], m["classes"], m["blank_idx"]) for f in fields(card)]
+    fld = [pack_field(f["key"], f["kind"], f["range"], m["classes"], m["blank_idx"], layout=f["layout"]) for f in fields(card)]
     mem = {"template.png": cv2.imencode(".png", gray)[1].tobytes(), "grid.json": json.dumps(grid, indent=1).encode(),
            "fields.json": json.dumps({"schema": "cardpack-fields/1", "classes": m["classes"], "blank_idx": m["blank_idx"], "fields": fld}, indent=1, ensure_ascii=False).encode(),
            "reader.onnx": b"",
@@ -249,3 +264,67 @@ def list_cards():
 
 def exists(card):
     return card == LEGACY or (bool(NAME.match(card)) and (TEMPLATES / card).is_dir())
+
+
+# ---------------------------------------------------------------- who wrote each card
+def writers_path(card):
+    return WORK / "writers.csv" if card == LEGACY else CARDS / card / "writers.csv"
+
+
+def writers(card):
+    """{page: writer code}."""
+    p = writers_path(card)
+    if not p.exists(): return {}
+    with open(p, newline="") as fh:
+        return {r["page"]: r["writer"] for r in csv.DictReader(fh) if r.get("writer")}
+
+
+def known_pages(card):
+    """Pages of a card that have labels or scans: what a writer can be assigned to."""
+    pages = {r["page"] for r in labels(card)[0]}
+    p = CARDS / card / "scans.csv"
+    if card != LEGACY and p.exists():
+        with open(p, newline="") as fh: pages |= {r["page"] for r in csv.DictReader(fh)}
+    return sorted(pages)
+
+
+def set_writers(card, writer, pages):
+    """Say that `writer` wrote these pages (an empty writer removes the assignment). A writer is a code, not a name: letters, digits, _ and -,
+    at most 24 characters. -> number of pages changed."""
+    if writer and not WRITER.match(writer): raise ValueError("a writer is a code of letters, digits, _ or - (at most 24 characters): use W07 or a clinic id, never a name")
+    pages = list(pages)
+    if not pages: raise ValueError("no pages to assign")
+    for pg in pages:
+        if not PAGE.match(pg): raise ValueError(f"bad page id {pg!r}")
+    cur = writers(card); changed = 0
+    for pg in pages:
+        if (cur.get(pg) or "") != writer: changed += 1
+        if writer: cur[pg] = writer
+        else: cur.pop(pg, None)
+    p = writers_path(card); p.parent.mkdir(parents=True, exist_ok=True); tmp = p.with_suffix(".csv.tmp")
+    with open(tmp, "w", newline="") as fh:
+        w = csv.writer(fh); w.writerow(["page", "writer"]); w.writerows(sorted(cur.items()))
+    tmp.replace(p)
+    return changed
+
+
+def pages_between(card, first, last):
+    """Known pages from `first` to `last` inclusive, in page order."""
+    if first > last: first, last = last, first
+    return [p for p in known_pages(card) if first <= p <= last]
+
+
+def split_units(card, pages):
+    """How to keep a train/test split honest. -> ({page: unit}, "writer" | "page", number of units). Every page of one writer is one unit when every
+    page given has a writer and there are at least MIN_WRITER_UNITS writers; otherwise each page is its own unit, and the split is by page only."""
+    w = writers(card)
+    if pages and all(p in w for p in pages) and len({w[p] for p in pages}) >= MIN_WRITER_UNITS:
+        return {p: w[p] for p in pages}, "writer", len({w[p] for p in pages})
+    return {p: p for p in pages}, "page", len(set(pages))
+
+
+def writer_status(card):
+    """For the Train tab: how many of this card's pages have a writer, and what a split would be by."""
+    pages = known_pages(card); w = writers(card); has = [p for p in pages if p in w]
+    units, unit, n = split_units(card, [r for r in {r["page"] for r in labels(card)[0]}])
+    return {"pages": len(pages), "assigned": len(has), "writers": len({w[p] for p in has}), "split_unit": unit, "units": n, "min_writers": MIN_WRITER_UNITS}

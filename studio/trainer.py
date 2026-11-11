@@ -9,7 +9,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "work_phaseA")); sys.path.insert(0, str(ROOT / "cardpack")); sys.path.insert(0, str(HERE))
-import cards, provenance
+import cards, provenance, subcells
 CFG = "light_lr3e-4"          # chosen on val in Phase A (selection.json)
 SEED = 20261103
 
@@ -18,25 +18,28 @@ def merge_labels(out, card=cards.LEGACY, dropped=None):
     """All labels for the card (cards.labels: later sources win, imports from phones / Label Studio included) written to `out`.
     A row with a `crop` path is read from there; anc rows without one use work/crops. `dropped` receives the counts of rows left out."""
     rows, problems = cards.labels(card)
-    with open(out, "w", newline="") as fh:
-        w = csv.DictWriter(fh, ["page", "row", "col", "label", "crop"]); w.writeheader(); w.writerows(rows)
     if dropped is not None: dropped.update(problems)
+    train_rows, merge_labels.layouts = subcells.expand(card, rows, dropped)       # a two-line cell is trained as its two pieces
+    with open(out, "w", newline="") as fh:
+        w = csv.DictWriter(fh, ["page", "row", "col", "label", "crop"]); w.writeheader(); w.writerows(train_rows)
     return rows
 
 
-def make_folds(rows, k=5, tries=4000):
-    pages = sorted({r["page"] for r in rows}); by = collections.defaultdict(collections.Counter)
-    for r in rows: by[r["page"]][r["row"]] += 1
+def make_folds(rows, k=5, tries=4000, units=None):
+    """k folds of pages. `units` ({page: writer or page}, cards.split_units) keeps every page of one unit in one fold: with writers known, a
+    fold is tested on people the other folds never saw. -> lists of pages."""
+    pages = sorted({r["page"] for r in rows}); units = units or {p: p for p in pages}; uo = sorted({units[p] for p in pages}); by = collections.defaultdict(collections.Counter)
+    for r in rows: by[units[r["page"]]][r["row"]] += 1
     tot = collections.Counter(r["row"] for r in rows); fields = [f for f, n in tot.items() if n >= 10]
     rng = random.Random(SEED); best = None
     for _ in range(tries):
-        s = pages[:]; rng.shuffle(s); folds = [sorted(s[i::k]) for i in range(k)]
-        cnt = [collections.Counter() for _ in folds]
-        for i, f in enumerate(folds):
-            for p in f: cnt[i].update(by[p])
+        s = uo[:]; rng.shuffle(s); groups = [sorted(s[i::k]) for i in range(k)]
+        cnt = [collections.Counter() for _ in groups]
+        for i, g in enumerate(groups):
+            for u in g: cnt[i].update(by[u])
         key = (sum(min(c[x] for c in cnt) for x in fields), -(max(sum(c.values()) for c in cnt) - min(sum(c.values()) for c in cnt)))
-        if best is None or key > best[0]: best = (key, folds)
-    return best[1]
+        if best is None or key > best[0]: best = (key, groups)
+    return [sorted(p for p in pages if units[p] in set(g)) for g in best[1]]
 
 
 def cv_job(a):
@@ -95,12 +98,17 @@ def main():
     try:
         status("labels", "merging labels")
         if not cards.exists(a.card): raise ValueError(f"no such card: {a.card}")
-        merged = run / "merged_labels.csv"; dropped = {}; rows = merge_labels(merged, a.card, dropped)
+        merged = run / "merged_labels.csv"; dropped = {}; rows = merge_labels(merged, a.card, dropped); layouts = merge_labels.layouts
+        whole = {(r["page"], r["row"], r["col"]): r["label"] for r in rows}
+        with open(merged, newline="") as fh: n_train = sum(1 for _ in csv.DictReader(fh))
         pages = sorted({r["page"] for r in rows})
         if len(pages) < cards.MIN_PAGES: raise ValueError(f"{len(rows)} labeled cells on {len(pages)} page(s): training needs at least {cards.MIN_PAGES} labeled pages")
-        folds = make_folds(rows)
+        units, unit, n_units = cards.split_units(a.card, pages)
+        if len(pages) < 5 or n_units < 5: raise ValueError(f"{n_units} {unit}(s): 5-fold cross-validation needs at least 5")
+        folds = make_folds(rows, units=units)
         assert sorted(sum(folds, [])) == pages and all(not set(folds[i]) & set(folds[j]) for i in range(5) for j in range(i))
-        split_bytes = json.dumps({"seed": SEED, "unit": "page", "folds": folds}, sort_keys=True).encode()
+        assert all(len({units[p] for p in f} & {units[p] for g in folds if g is not f for p in g}) == 0 for f in folds), "a writer appears in two folds"
+        split_bytes = json.dumps({"seed": SEED, "unit": unit, "folds": folds}, sort_keys=True).encode()
         (run / "folds.json").write_bytes(split_bytes)
         status("cv", f"{len(rows)} labeled cells, {len(pages)} pages; 0 of 5 folds done", cv_done=0)
         preds, bests, curves = [], [], []
@@ -108,7 +116,9 @@ def main():
             for fold, out, best, hist in pool.imap_unordered(cv_job, [(f, folds, str(merged), a.card, a.max_epochs) for f in range(5)]):
                 preds += out; bests.append(best); curves.append({"fold": fold, "best_epoch": best, "history": hist})
                 status("cv", f"{len(bests)} of 5 folds done", cv_done=len(bests))
-        assert len(preds) == len(rows) and len({(p["page"], p["row"], p["col"]) for p in preds}) == len(rows)
+        assert len(preds) == n_train and len({(p["page"], p["row"], p["col"]) for p in preds}) == n_train
+        parts_preds = preds; preds = subcells.compose(preds, layouts, whole) if layouts else preds       # two-line cells are scored as whole cells
+        assert len(preds) == len(rows) or layouts, "every labeled cell must have exactly one cross-validation read"
         cv = metrics(preds); overall = metrics([dict(p, row="ALL") for p in preds])["ALL"]
         epochs = int(statistics.median(bests))
         status("final", f"training the reader on all {len(pages)} pages for {epochs} epochs (median best epoch of the folds)", cv_done=5)
@@ -157,7 +167,7 @@ def main():
         else:
             man["preprocess"]["normalize"] = {"default": "flatten"}
         man["metrics"] = {"heldout": {"method": "pooled 5-fold CV by page of the same recipe; every labeled cell predicted once by a model that never saw its page",
-                                      "split_unit": "page (writer unknown)", "split_file_sha256": hashlib.sha256(split_bytes).hexdigest(),
+                                      "split_unit": f"writer ({n_units} writers)" if unit == "writer" else "page (writer unknown)", "split_file_sha256": hashlib.sha256(split_bytes).hexdigest(),
                                       "reader_trained_on": f"all {len(pages)} labeled pages for {epochs} epochs (the shipped weights have no held-out number of their own)",
                                       "gate": {"target_lower_bound_pct": a.target, "min_n": a.min_n},
                                       "per_field": {k: dict(n=v["n"], correct=v["k"], ci95=[round(v["lo"], 4), round(v["hi"], 4)]) for k, v in cv.items()}}}
@@ -168,7 +178,7 @@ def main():
         out_pack = cards.PACKS / f"{man['id']}_v{man['version']}.cardpack"; out_pack.parent.mkdir(parents=True, exist_ok=True); cp.build(mem, out_pack)
         errs = cp.validate(out_pack)
         crops_note = "stored gray crops (work/crops) or imported crops" if a.card == cards.LEGACY else f"stored gray crops (studio/cards/{a.card}/crops) or imported crops"
-        res = dict(card=a.card, dropped_labels=dropped, config=CFG, target=a.target, min_n=a.min_n, n_cells=len(rows), n_pages=len(pages), folds=[len(f) for f in folds], best_epochs=sorted(bests),
+        res = dict(card=a.card, split_unit=unit, split_units=n_units, dropped_labels=dropped, config=CFG, target=a.target, min_n=a.min_n, n_cells=len(rows), n_pages=len(pages), folds=[len(f) for f in folds], best_epochs=sorted(bests),
                    final_epochs=epochs, cv_all=overall, parity=parity, tflite=tfl, minutes=round((time.time() - t0) / 60, 1),
                    fields=[dict(field=k, **v, status=gate.get(k, ("needs-review", ""))[0], reason=gate.get(k, ("", ""))[1]) for k, v in sorted(cv.items(), key=lambda kv: -kv[1]["n"])],
                    unlabeled_fields=[f["key"] for f in fld["fields"] if f["key"] not in cv],
@@ -176,6 +186,7 @@ def main():
                    provenance=provenance.collect(merged, rows, SEED, CFG, hashlib.sha256(split_bytes).hexdigest(), crops_note + ", no line removal; page normalization not applied at training time"))
         json.dump(res, open(run / "results.json", "w"), indent=1)
         json.dump(preds, open(run / "cv_predictions.json", "w"))
+        if layouts: json.dump(parts_preds, open(run / "cv_predictions_pieces.json", "w"))
         json.dump({"note": "per-epoch history of each CV fold (loss, validation exact match and CER on that fold's 7 or so validation pages)", "folds": sorted(curves, key=lambda c: c["fold"])}, open(run / "history.json", "w"))
         status("done" if not errs else "error", "pack written" if not errs else f"pack failed validation: {errs}")
     except Exception:

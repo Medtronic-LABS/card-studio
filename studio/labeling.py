@@ -138,6 +138,10 @@ def save(card, page, field, visit, label="", note="", confirm=False, how=None):
     if len(label) > MAX_LABEL: raise ValueError(f"label is longer than {MAX_LABEL} characters")
     err, warn = check(fl[field], label) if label else (None, None)
     if err: raise ValueError(err)
+    if label and not warn and fl[field].get("layout", "single") != "single":
+        import subcells
+        if subcells.split_label(fl[field]["layout"], label) is None:
+            warn = {"stacked": "does not look like day.month.year, which a two-line date is split into for training", "diagonal": "does not look like systolic/diastolic, which a blood pressure is split into for training"}[fl[field]["layout"]]
     if warn and not confirm: return {"saved": False, "label": label, "note": note, "warning": warn}
     import suggest
     s = suggest.read(card).get((page, field, visit))        # what the AI said about this cell, if anything: kept beside the label
@@ -157,20 +161,24 @@ def clear(card, page, field, visit):
     return {"cleared": True}
 
 
-def set_field(card, key, kind, rng=None):
-    """Set one field's kind (and, for a number, its expected range) in fields.json."""
-    _card(card)
-    if key not in [f["key"] for f in cards.fields(card)]: raise KeyError("no such field")
+def set_field(card, key, kind, rng=None, layout=None):
+    """Set one field's kind (and, for a number, its expected range, and for a date or blood pressure, its layout) in fields.json.
+    layout None keeps the field's current layout when it still fits the new kind, otherwise goes back to single."""
+    import subcells
+    _card(card); cur = {f["key"]: f for f in cards.fields(card)}
+    if key not in cur: raise KeyError("no such field")
     if kind not in cards.KINDS: raise ValueError(f"kind must be one of {', '.join(cards.KINDS)}")
+    if layout is None: layout = cur[key]["layout"] if subcells.KIND_FOR.get(cur[key]["layout"]) == kind else "single"
+    subcells.check_layout(kind, layout)
     if rng is not None:
         if kind != "number" or not isinstance(rng, list) or len(rng) != 2 or not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in rng) or not rng[0] < rng[1]:
             raise ValueError("a range is [low, high] with low below high, and only for a number field")
     with _lock:
         p = cards.CARDS / card / "fields.json"; p.parent.mkdir(parents=True, exist_ok=True)
         spec = json.loads(p.read_text()).get("fields", {}) if p.exists() else {}
-        spec[key] = {"kind": kind, **({"range": rng} if rng is not None else {})}
+        spec[key] = {"kind": kind, **({"range": rng} if rng is not None else {}), **({"layout": layout} if layout != "single" else {})}
         p.write_text(json.dumps({"fields": spec}, indent=1))
-    return {"key": key, "kind": kind, "range": rng}
+    return {"key": key, "kind": kind, "range": rng, "layout": layout}
 
 
 def crop_path(card, field, visit, page):

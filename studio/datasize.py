@@ -110,20 +110,23 @@ def summary(card, target=None):
     for key in (latest or {}).get("unlabeled_fields", []):
         fields.append({"field": key, "kind": kinds.get(key, "?"), "n": 0, "k": 0, "exact": None, "lo": None, "verdict": "no-data", "need": None, "more": None})
     c = cards.describe(card)
-    return {"card": card, "target": target, "latest_run": runs[-1]["run"] if runs else None, "labeled": c["labels"], "fields": fields, "history": runs,
+    return {"card": card, "target": target, "latest_run": runs[-1]["run"] if runs else None, "labeled": c["labels"], "writers": cards.writer_status(card), "fields": fields, "history": runs,
             "counts": {v: sum(f["verdict"] == v for f in fields) for v in ("ship", "more-cells", "not-accurate", "no-data")},
             "more_cells_total": sum(f["more"] or 0 for f in fields), **read_curve(card)}
 
 
 # ---------------------------------------------------------------- learning curve (needs torch)
 def _job(a):
-    card, merged, rep, frac, max_epochs = a
+    card, merged, rep, frac, max_epochs, units = a
     import torch, common as C, train as T, trainer
     torch.set_num_threads(2); C.use_fields(cards.masks(card))
-    rows = C.read_labels(merged); pages = sorted({r["page"] for r in rows}); rng = random.Random(SEED + rep); rng.shuffle(pages)
-    n_test = max(2, round(len(pages) * TEST_SHARE)); test, pool = set(pages[:n_test]), pages[n_test:]
-    use = pool[:max(MIN_TRAIN_PAGES, round(len(pool) * frac))]
-    val = set(random.Random(1000 + rep).sample(use, max(2, round(len(use) / 5))))
+    rows = C.read_labels(merged); pages = sorted({r["page"] for r in rows})
+    # the split is made over units: a writer's pages (when writers are known) or single pages; a unit is never on both sides
+    uo = sorted({units[p] for p in pages}); random.Random(SEED + rep).shuffle(uo)
+    n_test = max(2, round(len(uo) * TEST_SHARE)); tu, pu = uo[:n_test], uo[n_test:]
+    test = {p for p in pages if units[p] in set(tu)}; use_units = pu[:max(MIN_TRAIN_PAGES, round(len(pu) * frac))]
+    use = [p for p in pages if units[p] in set(use_units)]
+    vu = set(random.Random(1000 + rep).sample(use_units, max(2, round(len(use_units) / 5)))); val = {p for p in use if units[p] in vu}
     tr = [r for r in rows if r["page"] in use and r["page"] not in val]; va = [r for r in rows if r["page"] in val]; te = [r for r in rows if r["page"] in test]
     assert not ({r["page"] for r in tr + va} & test)
     m, info = T.finetune(torch.load(ROOT / "work_phaseA" / "pretrained.pt"), tr, va, T.CONFIGS[trainer.CFG], seed=rep, max_epochs=max_epochs, log=lambda *_: None)
@@ -140,7 +143,9 @@ def curve(card, target=85.0, max_epochs=300, workers=4):
         status("labels", "merging labels"); merged = d / "merged_labels.csv"; rows = trainer.merge_labels(merged, card)
         pages = sorted({r["page"] for r in rows})
         if len(pages) < cards.MIN_PAGES + 2: raise ValueError(f"{len(pages)} labeled pages: a learning curve needs at least {cards.MIN_PAGES + 2}")
-        kinds = {f["key"]: f["kind"] for f in cards.fields(card)}; jobs = [(card, str(merged), r, f, max_epochs) for r in range(REPEATS) for f in FRACTIONS]
+        kinds = {f["key"]: f["kind"] for f in cards.fields(card)}; units, unit, n_units = cards.split_units(card, pages)
+        if n_units < cards.MIN_PAGES + 2: raise ValueError(f"{n_units} {unit}(s): a learning curve needs at least {cards.MIN_PAGES + 2}")
+        jobs = [(card, str(merged), r, f, max_epochs, units) for r in range(REPEATS) for f in FRACTIONS]
         status("training", f"0 of {len(jobs)} readers trained", done=0, total=len(jobs)); res = []
         with Pool(workers) as pool:
             for r in pool.imap_unordered(_job, jobs):
@@ -161,7 +166,7 @@ def curve(card, target=85.0, max_epochs=300, workers=4):
                             "test_cells": round(statistics.mean(sum(1 for row, _ in r["hits"] if ks is None or kinds.get(row) in ks) for r in reps), 1)})
             if len(pts) >= 2:
                 out[g] = {"points": pts, "fit": extrapolate([p["train_cells"] for p in pts], [1 - p["exact"] for p in pts], 1 - target / 100.0)}
-        doc = {"card": card, "made": time.strftime("%Y-%m-%d %H:%M"), "target": target, "labeled_cells": len(rows), "labeled_pages": len(pages), "repeats": REPEATS, "fractions": list(FRACTIONS),
+        doc = {"card": card, "made": time.strftime("%Y-%m-%d %H:%M"), "target": target, "labeled_cells": len(rows), "labeled_pages": len(pages), "split_unit": unit, "split_units": n_units, "repeats": REPEATS, "fractions": list(FRACTIONS),
                "test_share": TEST_SHARE, "max_epochs": max_epochs, "minutes": round((time.time() - t0) / 60, 1), "groups": out,
                "notes": ["Sizes are all labeled cells in the training share (every field), so a group's curve says how its accuracy moves as the whole labeled set grows.",
                          "Each point is the mean over repeats with different pages set aside; with few test cells the spread between repeats is wide.",

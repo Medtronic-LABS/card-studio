@@ -324,6 +324,10 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/cards": return self._send(200, cards.list_cards())
         if p == "/api/scans": return self._send(200, scans.summaries())
         if p == "/api/labelstudio": return self._send(200, labelstudio.status(parse_qs(urlparse(self.path).query).get("card", [None])[0]))
+        m = re.fullmatch(r"/api/card/([\w-]{1,40})/writers", p)
+        if m:
+            if not cards.exists(m[1]): return self._err(404, "no such card")
+            w = cards.writers(m[1]); return self._send(200, {**cards.writer_status(m[1]), "by_page": w})
         m = re.fullmatch(r"/api/card/([\w-]{1,40})/datasize", p)
         if m:
             try: return self._send(200, datasize.summary(m[1], parse_qs(urlparse(self.path).query).get("target", [None])[0]))
@@ -414,19 +418,26 @@ class H(BaseHTTPRequestHandler):
             if self.path.split("?")[0] == "/api/scans":
                 q = parse_qs(urlparse(self.path).query); card = q.get("card", [scans.AUTO])[0]
                 if card != scans.AUTO and not cards.NAME.match(card): raise ValueError("bad card name")
-                return self._send(200, {"results": scans.add(card, body, Path(q.get("name", ["scan"])[0]).name[:120])})
+                return self._send(200, {"results": scans.add(card, body, Path(q.get("name", ["scan"])[0]).name[:120], q.get("writer", [""])[0] or None)})
             m = re.fullmatch(r"/api/card/([\w-]{1,40})/datasize/curve", self.path)
             if m:
                 if not cards.exists(m[1]): raise KeyError("no such card")
                 return self._send(200, start_curve(m[1], json.loads(body or b"{}").get("target", 85.0)))
             m = re.fullmatch(r"/api/card/([\w-]{1,40})/suggest", self.path)
             if m: return self._send(200, suggest.make(m[1]))
+            m = re.fullmatch(r"/api/card/([\w-]{1,40})/writers", self.path)
+            if m:
+                if not cards.exists(m[1]): raise KeyError("no such card")
+                r = json.loads(body or b"{}"); pages = list(r.get("pages") or [])
+                if r.get("first") and r.get("last"): pages += cards.pages_between(m[1], str(r["first"]), str(r["last"]))
+                n = cards.set_writers(m[1], str(r.get("writer", "")).strip(), sorted(set(pages)))
+                return self._send(200, {"changed": n, **cards.writer_status(m[1])})
             m = re.fullmatch(r"/api/card/([\w-]{1,40})/(label|label/clear|field)", self.path)
             if m:
                 r = json.loads(body or b"{}"); cell = (str(r.get("page", "")), str(r.get("field", "")), str(r.get("visit", "")))
                 if m[2] == "label": return self._send(200, labeling.save(m[1], *cell, str(r.get("label", "")), str(r.get("note", "")), bool(r.get("confirm"))))
                 if m[2] == "label/clear": return self._send(200, labeling.clear(m[1], *cell))
-                return self._send(200, labeling.set_field(m[1], str(r.get("key", "")), str(r.get("kind", "")), r.get("range")))
+                return self._send(200, labeling.set_field(m[1], str(r.get("key", "")), str(r.get("kind", "")), r.get("range"), r.get("layout")))
             m = re.fullmatch(r"/api/pack/([\w.-]+)/tflite", self.path)
             if m:
                 f = HERE.parent / "cardpack" / "out" / m[1]

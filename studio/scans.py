@@ -17,7 +17,7 @@ A scan is `ok`, or `check` when it matched with fewer than CHECK_BELOW inliers (
 match is not stored. Adding the same file again replaces its earlier result. If the grid is edited, `recut` cuts every stored scan again
 from its aligned image; if the template image itself is replaced, stored scans are `stale` and have to be added again.
 
-CLI: python scans.py add <card|auto> FILE_OR_FOLDER...   |   python scans.py recut <card>   |   python scans.py summary [card]
+CLI: python scans.py add <card|auto> FILE_OR_FOLDER... [--writer CODE]   |   python scans.py recut <card>   |   python scans.py summary [card]
 """
 import csv, hashlib, json, re, sys, threading, time
 from pathlib import Path
@@ -152,9 +152,11 @@ def _page_id(card, source, sha, existing):
     return stem if all(r["page"] != stem for r in existing) else f"{stem}-{sha[:6]}"
 
 
-def add(card, data: bytes, source="scan"):
+def add(card, data: bytes, source="scan", writer=None):
     """Add one uploaded file (an image, or a PDF of several cards) to `card`, or to whichever card each page matches when card is AUTO.
+    writer: who wrote the cards in this file, as a code (cards.set_writers); every page added gets it. Not a name.
     -> one result per page: {source, page, card, status: ok | check | rejected, inliers, reason, cells, with_ink, tried}."""
+    if writer and not cards.WRITER.match(writer): raise ValueError("a writer is a code of letters, digits, _ or - (at most 24 characters): use W07 or a clinic id, never a name")
     among = targets() if card == AUTO else [target(card)]
     if not among: raise ValueError("no card has a template with a saved grid yet")
     out = []
@@ -181,6 +183,7 @@ def add(card, data: bytes, source="scan"):
                     "template_version": t.version, "grid_sha": t.grid_sha, "cells": len(cells), "with_ink": sum(c["ink"] for c in cells), "added": time.strftime("%Y-%m-%d %H:%M")}]
             _write(t.card, "scans.csv", SCAN_COLS, sorted(rows, key=lambda r: r["page"]))
             _write(t.card, "cells.csv", CELL_COLS, [r for r in _read(t.card, "cells.csv", CELL_COLS) if r["page"] != page] + cells)
+            if writer: cards.set_writers(t.card, writer, [page])
         out.append({"source": src, "page": page, "card": t.card, "status": status, "inliers": inl, "reason": why, "cells": len(cells),
                     "with_ink": sum(c["ink"] for c in cells), "tried": tried})
     return out
@@ -239,7 +242,7 @@ def remove(card, page):
     with _lock:
         rows = _read(card, "scans.csv", SCAN_COLS)
         if all(r["page"] != page for r in rows): raise KeyError("no such scan")
-        (cards.aligned_dir(card) / f"{page}.png").unlink(missing_ok=True); _drop_crops(card, page)
+        (cards.aligned_dir(card) / f"{page}.png").unlink(missing_ok=True); _drop_crops(card, page); cards.set_writers(card, "", [page])
         _write(card, "scans.csv", SCAN_COLS, [r for r in rows if r["page"] != page])
         _write(card, "cells.csv", CELL_COLS, [r for r in _read(card, "cells.csv", CELL_COLS) if r["page"] != page])
     return {"card": card, "removed": page}
@@ -253,10 +256,10 @@ def summary(card):
     live = [r for r in rows if r["status"] != "stale"]
     labeled = len(cards.labels(card)[0])
     return {"card": card, "template_version": t.version, "grid": {**cards.grid_shape(t.grid), "size": t.grid["image_size"]},
-            "scans": [{k: (int(r[k]) if k in ("inliers", "cells", "with_ink") and str(r[k]).isdigit() else r[k]) for k in SCAN_COLS if k != "sha256"} for r in rows],
+            "scans": [{**{k: (int(r[k]) if k in ("inliers", "cells", "with_ink") and str(r[k]).isdigit() else r[k]) for k in SCAN_COLS if k != "sha256"}, "writer": cards.writers(card).get(r["page"], "")} for r in rows],
             "totals": {"scans": len(rows), "ok": sum(r["status"] == "ok" for r in rows), "check": sum(r["status"] == "check" for r in rows),
                        "stale": len(rows) - len(live), "cells": sum(int(r["cells"] or 0) for r in live), "with_ink": sum(int(r["with_ink"] or 0) for r in live), "labeled": labeled},
-            "blank_card": (cards.CARDS / card / "blank.json").exists(),
+            "blank_card": (cards.CARDS / card / "blank.json").exists(), "writers": cards.writer_status(card),
             "needs_recut": sum(r["grid_sha"] != t.grid_sha for r in live)}
 
 
@@ -291,12 +294,12 @@ def overlay(card, page, width=1100):
     return cv2.imencode(".png", cv2.resize(vis, None, fx=s, fy=s, interpolation=cv2.INTER_AREA) if s < 1 else vis)[1].tobytes()
 
 
-def add_path(card, path):
+def add_path(card, path, writer=None):
     """CLI helper: a file, or every supported file in a folder (sorted)."""
     p = Path(path); files = sorted(f for f in p.rglob("*") if f.suffix.lower() in EXT) if p.is_dir() else [p]
     out = []
     for f in files:
-        try: res = add(card, f.read_bytes(), f.name)
+        try: res = add(card, f.read_bytes(), f.name, writer)
         except ValueError as e: res = [{"source": f.name, "page": None, "card": None, "status": "rejected", "inliers": 0, "reason": str(e), "cells": 0, "with_ink": 0}]
         for r in res: print(f"{r['source']:28s} {r['status']:8s} {r['card'] or '-':16s} {r['inliers']:5d} inliers  {r['with_ink']}/{r['cells']} cells with ink  {r['reason']}", flush=True)
         out += res
@@ -306,7 +309,9 @@ def add_path(card, path):
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "summary"
     if cmd == "add" and len(sys.argv) >= 4:
-        res = [r for p in sys.argv[3:] for r in add_path(sys.argv[2], p)]
+        args = sys.argv[3:]; writer = None
+        if "--writer" in args: i = args.index("--writer"); writer = args[i + 1]; args = args[:i] + args[i + 2:]
+        res = [r for p in args for r in add_path(sys.argv[2], p, writer)]
         print({s: sum(r["status"] == s for r in res) for s in ("ok", "check", "rejected")})
     elif cmd == "recut" and len(sys.argv) == 3: print(recut(sys.argv[2]))
     elif cmd == "summary":

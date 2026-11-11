@@ -153,6 +153,20 @@ def read_cell(pack, px, field):
     return "".join(out), (min(confs) if confs else 0.0)
 
 
+def read_two_line(pack, crop, field, layout):
+    """A cell written on two lines (subcells.py): read its two pieces separately and join them. -> (text, confidence). A piece the ink gate
+    calls empty, or that cannot be cut, makes the whole read empty: half a date or half a pressure is not a value."""
+    import subcells
+    try: pieces = subcells.parts(crop, layout)
+    except ValueError: return "", 0.0
+    reads = []
+    for piece in pieces:
+        px = prepare(piece, pack)
+        if px is None: return "", 0.0
+        reads.append(read_cell(pack, px, field))
+    return subcells.join(layout, reads[0][0], reads[1][0]), min(reads[0][1], reads[1][1])
+
+
 def run_method(pack, warped, covered, method):
     t0 = time.time()
     page, used = N.normalize_page(method, warped, covered, pack.flatten_k, pack.reference)
@@ -162,7 +176,8 @@ def run_method(pack, warped, covered, method):
         px = prepare(clean, pack)
         if px is None:
             reads[(ri, c)] = ("", 0.0, False); continue
-        ink += 1; text, conf = read_cell(pack, px, field)
+        layout = pack.spec[field].get("layout", "single")
+        ink += 1; text, conf = read_two_line(pack, crop, field, layout) if layout != "single" else read_cell(pack, px, field)
         reads[(ri, c)] = (text, conf, conf < (pack.spec[field].get("min_confidence") or 0.0))
     filled = [v for v in reads.values() if v[0]]
     return page, used, reads, {"seconds": round(time.time() - t0, 1), "cells": len(reads), "with_ink": ink, "read": len(filled),

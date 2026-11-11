@@ -1,29 +1,150 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "cardpack fields",
-  "type": "object", "additionalProperties": false, "required": ["schema", "classes", "blank_idx", "fields"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "classes",
+    "blank_idx",
+    "fields"
+  ],
   "properties": {
-    "schema": {"const": "cardpack-fields/1"},
-    "classes": {"type": "array", "items": {"type": "string"}, "minItems": 2},
-    "blank_idx": {"type": "integer", "minimum": 0},
-    "fields": {
-      "type": "array", "minItems": 1,
+    "schema": {
+      "const": "cardpack-fields/1"
+    },
+    "classes": {
+      "type": "array",
       "items": {
-        "type": "object", "additionalProperties": false,
-        "required": ["key", "kind", "allowed_idx", "range", "min_confidence", "status", "status_reason"],
+        "type": "string"
+      },
+      "minItems": 2
+    },
+    "blank_idx": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "kind",
+          "allowed_idx",
+          "range",
+          "min_confidence",
+          "status",
+          "status_reason"
+        ],
         "properties": {
-          "key": {"type": "string", "pattern": "^[A-Za-z0-9_]{1,40}$"},
-          "kind": {"enum": ["number", "date", "bp", "mark", "text"]},
-          "allowed_idx": {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 1, "uniqueItems": true},
-          "range": {"oneOf": [{"type": "null"}, {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}], "description": "inclusive; number kind only"},
-          "bp": {"type": "object", "additionalProperties": false, "required": ["sys", "dia", "sys_above_dia"],
-                 "properties": {"sys": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2},
-                                "dia": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2},
-                                "sys_above_dia": {"type": "boolean"}}},
-          "valid_values": {"type": "array", "items": {"type": "string"}, "minItems": 1, "description": "mark kind: the only reads that are not flagged"},
-          "min_confidence": {"oneOf": [{"type": "null"}, {"type": "number", "minimum": 0, "maximum": 1}]},
-          "status": {"enum": ["ship", "needs-review"]},
-          "status_reason": {"type": "string"}
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_]{1,40}$"
+          },
+          "kind": {
+            "enum": [
+              "number",
+              "date",
+              "bp",
+              "mark",
+              "text"
+            ]
+          },
+          "allowed_idx": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "range": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            ],
+            "description": "inclusive; number kind only"
+          },
+          "bp": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sys",
+              "dia",
+              "sys_above_dia"
+            ],
+            "properties": {
+              "sys": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "dia": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "sys_above_dia": {
+                "type": "boolean"
+              }
+            }
+          },
+          "valid_values": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "description": "mark kind: the only reads that are not flagged"
+          },
+          "min_confidence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "ship",
+              "needs-review"
+            ]
+          },
+          "status_reason": {
+            "type": "string"
+          },
+          "layout": {
+            "enum": [
+              "single",
+              "stacked",
+              "diagonal"
+            ],
+            "description": "single (default): one line of writing. stacked: a date written as day.month over a bar over the year. diagonal: a blood pressure written either side of a printed diagonal. The reader reads the two pieces separately and joins them"
+          }
         }
       }
     }
