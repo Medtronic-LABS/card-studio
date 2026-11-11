@@ -13,7 +13,7 @@
    "file": "docs/screenshots/model-quality.png",
    "view": "model-quality",
    "caption": "Model quality: per-field errors, calibration, risk-coverage, confusions, flag-policy tuner, provenance",
-   "sha256": "9045a7ba697eafcb38ffb82941bc4544fce5970ee74ba0abeb76faeb0d92371b",
+   "sha256": "0d7ef9f5ba9ae9790068934d5a1941c64c2ddeda567b090bbc759543abc631d5",
    "images_on_page": 0
   },
   {

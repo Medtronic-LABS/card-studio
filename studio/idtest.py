@@ -203,7 +203,7 @@ def match(q, t, ratio=.75, px=4.0):
     inl = mask.ravel().astype(bool)
     res["inliers"] = int(inl.sum())
     quad = cv2.perspectiveTransform(np.float32([[0, 0], [qw, 0], [qw, qh], [0, qh]]).reshape(-1, 1, 2), H).reshape(4, 2)
-    cr = [np.cross(quad[(i + 1) % 4] - quad[i], quad[(i + 2) % 4] - quad[(i + 1) % 4]) for i in range(4)]
+    e = [quad[(i + 1) % 4] - quad[i] for i in range(4)]; cr = [float(e[i][0] * e[(i + 1) % 4][1] - e[i][1] * e[(i + 1) % 4][0]) for i in range(4)]   # z of the 2-D cross product (np.cross no longer takes 2-D vectors)
     res["convex"] = bool(all(c > 0 for c in cr) or all(c < 0 for c in cr))
     res["mirrored"] = bool(cr[0] < 0)
     res["area_ratio"] = float(_poly_area(quad) / (tw * th))

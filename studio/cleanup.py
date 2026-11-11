@@ -60,7 +60,7 @@ def align(bgr, pack):
         return None, 0, "no homography"
     qh, qw = gray.shape; th, tw = pack.tpl.shape
     quad = cv2.perspectiveTransform(np.float32([[0, 0], [qw, 0], [qw, qh], [0, qh]]).reshape(-1, 1, 2), H).reshape(4, 2)
-    cr = [np.cross(quad[(i + 1) % 4] - quad[i], quad[(i + 2) % 4] - quad[(i + 1) % 4]) for i in range(4)]
+    e = [quad[(i + 1) % 4] - quad[i] for i in range(4)]; cr = [float(e[i][0] * e[(i + 1) % 4][1] - e[i][1] * e[(i + 1) % 4][0]) for i in range(4)]   # z of the 2-D cross product (np.cross no longer takes 2-D vectors)
     area = 0.5 * abs(np.dot(quad[:, 0], np.roll(quad[:, 1], -1)) - np.dot(quad[:, 1], np.roll(quad[:, 0], -1))) / (tw * th)
     if not (all(c > 0 for c in cr) or all(c < 0 for c in cr)):
         return H, inl, "not convex"
