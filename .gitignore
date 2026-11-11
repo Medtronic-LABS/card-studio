@@ -5,6 +5,7 @@ studio/runs/
 studio/uploads/
 studio/templates/
 studio/cards/
+studio/curves/
 studio/.venv-labelstudio/
 studio/.venv-tflite/
 studio/labelstudio.json

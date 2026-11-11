@@ -144,7 +144,7 @@ def pull(card):
         note = note if note in ("blank", "unreadable") else ""
         was = have.get((page, field, visit))
         try:
-            r = labeling.save(card, page, field, visit, label, note, confirm=True)
+            r = labeling.save(card, page, field, visit, label, note, confirm=True, how="labelstudio")
         except (ValueError, KeyError) as e:
             rejected.append({"page": page, "field": field, "visit": visit, "label": label, "reason": str(e).strip("'\"")}); continue
         if was is None: new += 1

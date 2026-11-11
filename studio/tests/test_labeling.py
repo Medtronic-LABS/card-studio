@@ -69,7 +69,7 @@ class Save(Base):
         self.assertEqual(labeling.queue("alpha", show="done")["total"], 0)
         self.assertTrue(labeling.save("alpha", "p-000", F[0], "c1", "570", confirm=True)["saved"])
         for field, visit, label in ((F[0], "c1", "57.5"), (F[0], "c1", "-"), (F[1], "c2", "22/2/26"), (F[1], "c2", "3.11.2026"), (F[2], "c3", "120/80")):
-            self.assertEqual(labeling.save("alpha", "p-001", field, visit, label), {"saved": True, "label": label, "note": "", "warning": None})
+            self.assertEqual(labeling.save("alpha", "p-001", field, visit, label), {"saved": True, "label": label, "note": "", "warning": None, "how": "typed"})
 
     def test_bad_cells_notes_and_empty_labels(self):
         with self.assertRaises(KeyError): labeling.save("alpha", "p-999", F[0], "c1", "57")

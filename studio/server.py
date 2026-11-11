@@ -8,7 +8,7 @@ import cv2
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cardpack"))
 import cardpack as cp
 from detect import detect_layout, load_normalized, match_score
-import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export
+import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize
 from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
@@ -76,6 +76,21 @@ def list_templates():
 PHASEA = HERE.parent / "work_phaseA"
 RUNS = HERE / "runs"
 _proc = None  # the one training run this server started
+_curve = None  # the one learning-curve job this server started
+
+
+def start_curve(card, target=85.0):
+    """Start `datasize.py curve` for a card in the background. One heavy job at a time: not while a training run or another curve is going."""
+    global _curve
+    if (_proc is not None and _proc.poll() is None) or (_curve is not None and _curve.poll() is None):
+        raise ValueError("a training run or a learning curve is already in progress")
+    c = cards.describe(card)
+    if not c["trainable"]: raise ValueError(f"{card} cannot be trained yet: {c['blocker']}")
+    if not (50 <= float(target) <= 100): raise ValueError("target must be 50-100")
+    d = datasize.CURVES / card; d.mkdir(parents=True, exist_ok=True)
+    (d / "status.json").write_text(json.dumps({"stage": "labels", "detail": "starting", "elapsed": 0, "card": card}))
+    _curve = subprocess.Popen([sys.executable, str(HERE / "datasize.py"), "curve", card, "--target", str(float(target))], stdout=open(d / "log.txt", "w"), stderr=subprocess.STDOUT, cwd=str(HERE))
+    return {"card": card, "started": True}
 
 
 def list_packs():
@@ -309,12 +324,17 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/cards": return self._send(200, cards.list_cards())
         if p == "/api/scans": return self._send(200, scans.summaries())
         if p == "/api/labelstudio": return self._send(200, labelstudio.status(parse_qs(urlparse(self.path).query).get("card", [None])[0]))
+        m = re.fullmatch(r"/api/card/([\w-]{1,40})/datasize", p)
+        if m:
+            try: return self._send(200, datasize.summary(m[1], parse_qs(urlparse(self.path).query).get("target", [None])[0]))
+            except KeyError as e: return self._err(404, str(e).strip("'\""))
+            except ValueError as e: return self._err(400, str(e))
         m = re.fullmatch(r"/api/card/([\w-]{1,40})/(labeling|labeling/queue)", p)
         if m:
             try:
                 if m[2] == "labeling": return self._send(200, labeling.overview(m[1]))
                 q = parse_qs(urlparse(self.path).query); g = lambda k, d=None: q.get(k, [d])[0]
-                return self._send(200, labeling.queue(m[1], g("field") or None, g("show", "todo"), int(g("limit", "60")), g("after")))
+                return self._send(200, labeling.queue(m[1], g("field") or None, g("show", "todo"), int(g("limit", "60")), g("after"), g("order", "reading")))
             except KeyError as e: return self._err(404, str(e).strip("'\""))
             except ValueError as e: return self._err(400, str(e))
         m = re.fullmatch(r"/api/card/([\w-]{1,40})/crop/(\w{1,40})/(c\d{1,2})/([\w-]{1,40})\.png", p)
@@ -395,6 +415,12 @@ class H(BaseHTTPRequestHandler):
                 q = parse_qs(urlparse(self.path).query); card = q.get("card", [scans.AUTO])[0]
                 if card != scans.AUTO and not cards.NAME.match(card): raise ValueError("bad card name")
                 return self._send(200, {"results": scans.add(card, body, Path(q.get("name", ["scan"])[0]).name[:120])})
+            m = re.fullmatch(r"/api/card/([\w-]{1,40})/datasize/curve", self.path)
+            if m:
+                if not cards.exists(m[1]): raise KeyError("no such card")
+                return self._send(200, start_curve(m[1], json.loads(body or b"{}").get("target", 85.0)))
+            m = re.fullmatch(r"/api/card/([\w-]{1,40})/suggest", self.path)
+            if m: return self._send(200, suggest.make(m[1]))
             m = re.fullmatch(r"/api/card/([\w-]{1,40})/(label|label/clear|field)", self.path)
             if m:
                 r = json.loads(body or b"{}"); cell = (str(r.get("page", "")), str(r.get("field", "")), str(r.get("visit", "")))

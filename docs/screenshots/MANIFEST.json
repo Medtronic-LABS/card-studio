@@ -6,14 +6,14 @@
    "file": "docs/screenshots/dashboard.png",
    "view": "dashboard",
    "caption": "Dashboard: model registry, getting started, activity, needs attention, field readiness",
-   "sha256": "d66e6cb0faa9434212fa9b1d19972f23b5f4c90595c46348c4b8932c83ffc09c",
+   "sha256": "9e2844608d303a2084c3267f3f10769ab96ffb8c7fbc27d956bf09e40910df7d",
    "images_on_page": 0
   },
   {
    "file": "docs/screenshots/model-quality.png",
    "view": "model-quality",
    "caption": "Model quality: per-field errors, calibration, risk-coverage, confusions, flag-policy tuner, provenance",
-   "sha256": "5c8a94a2cf3123be1ec21cdafc4d4a9139e89ce76379c74c8f1297264f03b65e",
+   "sha256": "4815b222fb66da8869f5ee8e298b35c266f5f440f12a7e8ac9643f029b023431",
    "images_on_page": 0
   },
   {
@@ -27,7 +27,7 @@
    "file": "docs/screenshots/train-and-ship.png",
    "view": "train-and-ship",
    "caption": "Train and ship: held-out gate per field",
-   "sha256": "f4b7b338a739bc2570471e5c807e501cf623215591facce1df766c7641be532e",
+   "sha256": "fb8e848ed503f0c35b929f78a08b28bb6736465e66476e20d939fe025f3b157d",
    "images_on_page": 0
   },
   {
@@ -41,7 +41,7 @@
    "file": "docs/screenshots/label.png",
    "view": "label",
    "caption": "Label and import corrected labels",
-   "sha256": "a89668be3951e53652cfbb735321921f929208d19dd0350ad4d0a375608a8db5",
+   "sha256": "4148b25c51a3bde3edc66bdcff6078f3c599e4b955787905ff25fdc0f8472243",
    "images_on_page": 0
   }
  ]
