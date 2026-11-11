@@ -5,7 +5,8 @@ model_meta.json; pack derived from the latest anc pack). Every other card is a s
 studio/cards/<name>/ (patient data: gitignored):
     labels.csv                     one row per labeled cell, columns: page, row, col, label (row = grid row name, col = c1..cN)
     crops/<row>/<col>/<page>.png   the cell image, same layout as work/crops
-    aligned/<page>.png             scans warped onto the template (only used for the pack's gray-level reference)
+    aligned/<page>.png             scans warped onto the template at the grid's resolution (scans.py writes these and the crops)
+    scans.csv, cells.csv           what scans.py recorded per scan and per cut cell (which cells have ink)
     fields.json                    optional, {"fields": {"<row>": {"kind": "number", "range": [30, 150]}}}; a row not listed is `text`
 
 All cards share one class list (model_meta.json) and one pretrained reader; a card only chooses which classes each field may emit."""
@@ -26,6 +27,8 @@ KIND_CHARS = {"number": "-.0123456789", "date": "-./0123456789", "bp": "/0123456
 META_KIND = {"numeric": "number", "date": "date", "bp": "bp", "mark": "mark", "text": "text"}
 MIN_PAGES = 10          # 5 folds by page, and each fold still needs validation and training pages
 CELL_MARGIN = 12
+INK_GATE = {"dark_below": 110, "min_dark_pixels": 40, "min_dark_fraction": 0.006}
+GRID_LONG_SIDE = 2000   # a card is read at about this many pixels on its long side (the ANC grid is 2338), whatever size the template photo is
 
 
 def meta():
@@ -52,11 +55,22 @@ def template_version(card):
     return vs[0] if vs else None
 
 
-def _tdir(card):
+def template_dir(card):
     v = template_version(card)
     if v is None:
         raise ValueError(f"card {card!r} has no template with a saved grid")
     return TEMPLATES / card / f"v{v}"
+
+
+def pack_grid(card):
+    """-> (grid, scale): the template's grid at reading resolution. A template photo is often small (Studio caps it for the editor), so the
+    grid is scaled by a whole number and the pack says so in template.grid_scale; scans are warped to this size before cells are cut."""
+    g = json.loads((template_dir(card) / "grid.json").read_text())
+    k = min(3, max(1, round(GRID_LONG_SIDE / max(g["image_size"]))))
+    f = lambda v: round(v * k, 1)
+    return {"image_size": [g["image_size"][0] * k, g["image_size"][1] * k], "rows": g["rows"], "y_ref_top": f(g["y_ref_top"]), "y_ref_bot": f(g["y_ref_bot"]),
+            "col_lines_top": [f(v) for v in g["col_lines_top"]], "col_lines_bot": [f(v) for v in g["col_lines_bot"]],
+            "row_lines_by_col": [[f(v) for v in col] for col in g["row_lines_by_col"]]}, float(k)
 
 
 def pack_versions(card):
@@ -68,7 +82,7 @@ def fields(card):
     """[{key, kind, range}] in grid row order. `anc`: every field in model_meta.json."""
     if card == LEGACY:
         return [{"key": k, "kind": META_KIND[v["type"]], "range": None} for k, v in meta()["fields"].items()]
-    rows = json.loads((_tdir(card) / "grid.json").read_text())["rows"]
+    rows = json.loads((template_dir(card) / "grid.json").read_text())["rows"]
     fp = CARDS / card / "fields.json"
     spec = json.loads(fp.read_text()).get("fields", {}) if fp.exists() else {}
     unknown = sorted(set(spec) - set(rows))
@@ -125,8 +139,9 @@ def labels(card):
         return [{"page": k[0], "row": k[1], "col": k[2], "label": v[0], "crop": v[1]} for k, v in sorted(cells.items()) if v[0].strip() != ""], {}
     p = CARDS / card / "labels.csv"
     if p.exists():
-        for r in csv.DictReader(open(p, newline="")):
-            cells[(r["page"], r["row"], r["col"])] = (r["label"], "")
+        with open(p, newline="") as fh:
+            for r in csv.DictReader(fh):
+                cells[(r["page"], r["row"], r["col"])] = (r["label"], "")
     for r, crop in _imported(card):
         cells[(r["page"], r["row"], r["col"])] = (r["label"], crop)
     m = meta(); allowed = {k: {m["classes"][i] for i in v} for k, v in masks(card).items()}
@@ -163,24 +178,24 @@ def base_members(card):
     pid = pack_id(card)
     if not PACK_ID.match(pid):
         raise ValueError(f"card name {card!r} cannot be a pack id (lower-case letters, digits, _ or -, starting with a letter or digit, max 32)")
-    d = _tdir(card); m = meta()
+    d = template_dir(card); m = meta()
     gray = cv2.imread(str(d / "template.png"), cv2.IMREAD_GRAYSCALE)
     if gray is None:
         raise ValueError("template image is missing or unreadable")
     th, tw = gray.shape
-    grid = json.loads((d / "grid.json").read_text())
-    if grid["image_size"] != [tw, th]:
-        raise ValueError(f"grid is for a {grid['image_size']} image but the template is {[tw, th]}: save the grid again")
+    if json.loads((d / "grid.json").read_text())["image_size"] != [tw, th]:
+        raise ValueError(f"grid is for a different image size than the template ({[tw, th]}): save the grid again")
+    grid, scale = pack_grid(card)
     fld = [pack_field(f["key"], f["kind"], f["range"], m["classes"], m["blank_idx"]) for f in fields(card)]
     mem = {"template.png": cv2.imencode(".png", gray)[1].tobytes(), "grid.json": json.dumps(grid, indent=1).encode(),
            "fields.json": json.dumps({"schema": "cardpack-fields/1", "classes": m["classes"], "blank_idx": m["blank_idx"], "fields": fld}, indent=1, ensure_ascii=False).encode(),
            "reader.onnx": b"",
            "fallback.json": json.dumps({"engine": "qwen3-vl", "when": "flagged", "image_px": 256, "prompt": "short", "apply_field_checks": True}, indent=1).encode()}
     man = {"format": "cardpack/1", "id": pid, "version": (pack_versions(card) or [0])[-1], "name": card, "created": time.strftime("%Y-%m-%d"),
-           "template": {"file": "template.png", "width": tw, "height": th, "grid_scale": 1.0},
+           "template": {"file": "template.png", "width": tw, "height": th, "grid_scale": scale},
            "match": {"method": "sift-ransac", "detect_long_side": 1600, "ratio": 0.75, "ransac_px": 4.0, "min_matches": 10, "min_inliers": 40},
            "grid": {"file": "grid.json", "type": "ruled-columns-v1", "cell_margin": CELL_MARGIN},
-           "preprocess": {"flatten_kernel": 61, "remove_lines": True, "ink_gate": {"dark_below": 110, "min_dark_pixels": 40, "min_dark_fraction": 0.006}},
+           "preprocess": {"flatten_kernel": 61, "remove_lines": True, "ink_gate": dict(INK_GATE)},
            "reader": {"file": "reader.onnx", "input": {"name": "image", "height": m["img_h"], "width": m["img_w"], "mean": 0.5, "std": 0.5},
                       "output": {"name": "logits", "layout": "TBV"}, "decode": "ctc-greedy-masked", "confidence": "min-char-softmax"},
            "fields": "fields.json", "fallback": "fallback.json", "metrics": {"heldout": None}, "files": {}}

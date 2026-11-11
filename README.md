@@ -13,7 +13,7 @@ _Aggregate numbers from the author's own labeled data, updated 2026-11-11. Held-
 | | |
 |---|---|
 | Card types / pack versions | 1 / 4 |
-| Saved templates | 2 |
+| Saved templates | 3 |
 | Labeled cells | 369 on 49 pages |
 | Training runs / experiment records | 2 / 4 |
 | Fields that meet the ship gate | 3 of 22 (anc v6) |
@@ -54,7 +54,7 @@ _Aggregate numbers from the author's own labeled data, updated 2026-11-11. Held-
 
 | Piece | What it does |
 |---|---|
-| **Card Studio** (`studio/`) | A local web app: upload and identify a card, detect and edit its layout, label cells, train and gate a reader, compare runs, inspect model quality, and try photo clean-up options. Stdlib `http.server`, OpenCV, no framework. UI: [Tabler](https://tabler.io) (MIT), vendored, no CDN. |
+| **Card Studio** (`studio/`) | A local web app: upload and identify a card, detect and edit its layout, add filled scans (each is matched to its template, straightened and cut into cells), label cells, train and gate a reader, compare runs, inspect model quality, and try photo clean-up options. Stdlib `http.server`, OpenCV, no framework. UI: [Tabler](https://tabler.io) (MIT), vendored, no CDN. |
 | **Card pack format** (`cardpack/`) | One zip holding everything a phone needs to recognise and read one card type: template, grid, field rules, reader model, preprocessing. Versioned, hashed, validated. See [`cardpack/CARDPACK.md`](cardpack/CARDPACK.md). |
 | **Training recipe** (`work_phaseA/`) | CRNN + CTC reader (about 538k parameters), page-level splits, field-masked decoding, Wilson intervals. |
 | **Tools** (`tools/`) | The leak check, screenshot capture, README generator and publish script. |
@@ -100,5 +100,7 @@ docs/          screenshots/ (registered in MANIFEST.json), status.json
 
 - Evidence comes from a small labeled set; most fields have under 40 held-out cells, so differences of a few points are noise.
 - The phone app is not part of this repository. Phone-photo accuracy has not been measured on real labeled phone photos.
-- Any saved template with a grid can be trained once it has labeled cell crops in `studio/cards/<name>/` (see `studio/cards.py`), but Studio does not yet cut or label those cells itself: only the ANC card has that tooling. Match and preprocessing settings in a new card's pack are the ANC values, untuned.
+- Any saved template with a grid can take filled scans (`studio/scans.py`, or Filled scans on the Cards tab) and be trained once its cells are labeled, but Studio has no labeling screen for new cards yet: labels go in `studio/cards/<name>/labels.csv` by hand. Only the ANC card has a labeler. Match and preprocessing settings in a new card's pack are the ANC values, untuned.
+- The grid format describes named field rows crossed with visit columns. A card laid out the other way (one row per visit, one column per field) cannot be described yet.
+- A template should come from the same kind of capture as the scans it will match: a colour phone photo used as the template did not match photocopied scans of the same card.
 - License: not chosen yet. Until the maintainers add a `LICENSE` file, all rights are reserved.

@@ -8,7 +8,7 @@ import cv2
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cardpack"))
 import cardpack as cp
 from detect import detect_layout, load_normalized, match_score
-import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards
+import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans
 from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
@@ -299,6 +299,11 @@ class H(BaseHTTPRequestHandler):
             except KeyError as e: return self._err(404, str(e).strip("'\""))
             except ValueError as e: return self._err(400, str(e))
         if p == "/api/cards": return self._send(200, cards.list_cards())
+        if p == "/api/scans": return self._send(200, scans.summaries())
+        m = re.fullmatch(r"/api/card/([\w-]{1,40})/scan/([\w-]{1,40})\.png", p)
+        if m:
+            try: return self._send(200, scans.overlay(m[1], m[2]), "image/png")
+            except (KeyError, ValueError) as e: return self._err(404, str(e).strip("'\""))
         if p == "/api/runs": return self._send(200, history.list_runs())
         if p == "/api/runs/compare":
             q = parse_qs(urlparse(self.path).query)
@@ -359,6 +364,12 @@ class H(BaseHTTPRequestHandler):
             if self.path == "/api/train/start": return self._send(200, start_training(json.loads(body or b"{}")))
             if self.path.split("?")[0] == "/api/cleanup": return self._cleanup(body, parse_qs(urlparse(self.path).query))
             if self.path == "/api/template/grid": return self._save_grid(json.loads(body))
+            if self.path.split("?")[0] == "/api/scans":
+                q = parse_qs(urlparse(self.path).query); card = q.get("card", [scans.AUTO])[0]
+                if card != scans.AUTO and not cards.NAME.match(card): raise ValueError("bad card name")
+                return self._send(200, {"results": scans.add(card, body, Path(q.get("name", ["scan"])[0]).name[:120])})
+            m = re.fullmatch(r"/api/card/([\w-]{1,40})/(recut|scan/delete)", self.path)
+            if m: return self._send(200, scans.recut(m[1]) if m[2] == "recut" else scans.remove(m[1], str(json.loads(body or b"{}").get("page", ""))))
             if self.path == "/api/import/corrections": return self._send(200, corrections.import_phone_zip(body))
             if self.path == "/api/import/label-studio": return self._send(200, corrections.import_label_studio(body))
         except KeyError as e:
