@@ -99,7 +99,7 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}.side input,.
   </div>
  </div>
  <div class="view hide" id="v-label"><div class="card"><h2>Label cells</h2><div id="lbody" class="tag">loading…</div></div></div>
- <div class="view hide" id="v-train"><div class="card" id="gate"><h2>Train / Gate / Export <span class="tag">(ANC card, from the labeled cells)</span></h2><div id="gbody"></div></div></div>
+ <div class="view hide" id="v-train"><div class="card" id="gate"><h2>Train / Gate / Export <span class="tag">(one card type at a time, from its labeled cells)</span></h2><div id="gbody"></div></div></div>
  <div class="view hide" id="v-history">
   <div class="card"><h2>Training runs</h2><div class="tag">Every Train &amp; ship run is kept. Tick two runs to compare them field by field. Held-out numbers only (pooled 5-fold CV by page).</div>
    <div id="runs" style="margin-top:8px">loading…</div>
@@ -318,19 +318,22 @@ function renderArch(){
 
 function gateRow(f){const pct=v=>(v*100).toFixed(0),ship=f.status==='ship';
  return `<tr><td>${esc(f.field)}</td><td>${f.k}/${f.n}</td><td>${pct(f.exact)}%</td><td><div style="position:relative;height:10px;width:120px;background:var(--line);border-radius:5px" title="95% CI ${pct(f.lo)}-${pct(f.hi)}%"><div style="position:absolute;left:${f.lo*100}%;width:${(f.hi-f.lo)*100}%;height:10px;background:var(--s1);opacity:.6;border-radius:5px"></div><div style="position:absolute;left:${f.exact*100}%;top:-1px;width:3px;height:12px;background:var(--ink)"></div></div><span class="tag">${pct(f.lo)}-${pct(f.hi)}%</span></td><td>${f.cer.toFixed(2)}</td><td><span class="badge ${ship?'bg-green-lt':'bg-orange-lt'}">${ship?'SHIP':'needs-review'}</span><div class="tag">${esc(f.reason)}</div></td></tr>`}
-async function gatePoll(){try{const t=await api('/api/train/status');const run=t.state==='running'||t.state==='stalled';
- let h=`<div class="row"><label>Target: lower 95% bound at least <input id="gt" type="number" min="50" max="100" value="${t.target??85}" class="num">%</label><label>Min held-out cells <input id="gn" type="number" min="1" value="${t.min_n??20}" class="num"></label><button class="btn btn-primary" id="gs" ${t.state==='running'?'disabled':''} onclick="gateStart()">Train + gate + export</button><a class="tag" href="http://127.0.0.1:8766" target="_blank">Label more cells (opens the labeler)</a></div>
- <div class="tag">A field ships only if the lower end of its 95% interval, measured on pages the model never saw (pooled 5-fold CV), meets the target with enough cells. Otherwise it is needs-review. The shipped reader is trained on all pages; its held-out numbers come from the same recipe in CV.</div>`;
+let GCARD=null,GTIMER=null;
+async function gatePoll(){clearTimeout(GTIMER);try{const [t,cs]=await Promise.all([api('/api/train/status'),api('/api/cards')]);const run=t.state==='running'||t.state==='stalled';
+ if(!GCARD)GCARD=t.card||'anc';const gc=cs.find(c=>c.id===GCARD)||cs[0];
+ let h=`<div class="row"><label>Card <select id="gc" onchange="GCARD=this.value;gatePoll()">${cs.map(c=>`<option value="${esc(c.id)}" ${c.id===gc.id?'selected':''}>${esc(c.id)}${c.trainable?'':' (not ready)'}</option>`).join('')}</select></label><label>Target: lower 95% bound at least <input id="gt" type="number" min="50" max="100" value="${t.target??85}" class="num">%</label><label>Min held-out cells <input id="gn" type="number" min="1" value="${t.min_n??20}" class="num"></label><button class="btn btn-primary" id="gs" ${t.state==='running'||!gc.trainable?'disabled':''} onclick="gateStart()">Train + gate + export</button><a class="tag" href="http://127.0.0.1:8766" target="_blank">Label more cells (opens the labeler)</a></div>
+ <div class="tag">A field ships only if the lower end of its 95% interval, measured on pages the model never saw (pooled 5-fold CV), meets the target with enough cells. Otherwise it is needs-review. The shipped reader is trained on all pages; its held-out numbers come from the same recipe in CV.</div>
+ <div class="tag"><b>${esc(gc.id)}</b>: ${gc.labels.cells} labeled cells on ${gc.labels.pages} pages${gc.grid?` · grid ${gc.grid.rows} rows x ${gc.grid.cols} columns`:''}${gc.pack_versions.length?` · latest pack v${gc.pack_versions[gc.pack_versions.length-1]}`:' · no pack yet'}${gc.trainable?'':` · <b class="warn">not ready: ${esc(gc.blocker)}</b>`}</div>`;
  if(t.state!=='none'){const steps=['labels','cv','final','export','done'],i=Math.max(0,steps.indexOf(t.stage));
-  h+=`<div class="row" style="margin-top:8px"><b class="${t.state==='done'?'ok':t.state==='error'?'bad':'warn'}">${t.state.toUpperCase()}</b><span class="tag">stage ${steps.indexOf(t.stage)<0?t.stage:(i+1)+'/5 '+t.stage} · ${esc(t.detail||'')} · ${t.elapsed??0}s</span></div>
+  h+=`<div class="row" style="margin-top:8px"><b class="${t.state==='done'?'ok':t.state==='error'?'bad':'warn'}">${t.state.toUpperCase()}</b><span class="tag">${esc(t.card||'anc')} · stage ${steps.indexOf(t.stage)<0?t.stage:(i+1)+'/5 '+t.stage} · ${esc(t.detail||'')} · ${t.elapsed??0}s</span></div>
   <div style="height:10px;background:var(--line);border-radius:6px;overflow:hidden"><div style="height:100%;width:${t.state==='done'?100:i*20+(t.stage==='cv'?(t.cv_done||0)*3:0)}%;background:var(--acc)"></div></div>`}
  if(t.results){const r=t.results,ok=!r.pack.validation_errors.length;
   h+=`<div class="msg ${ok?'':'bad'}" style="margin-top:10px"><b>${ok?'Pack written and validated':'Pack failed validation'}:</b> ${esc(r.pack.id)} v${r.pack.version} · shipped fields: ${r.pack.shipped.length} of ${r.fields.length+r.unlabeled_fields.length} · <span class="tag">${esc(r.pack.path)}</span>
   <div class="tag">${r.n_cells} labeled cells on ${r.n_pages} pages · pooled held-out exact ${(r.cv_all.exact*100).toFixed(0)}% [${(r.cv_all.lo*100).toFixed(0)}-${(r.cv_all.hi*100).toFixed(0)}] · final reader ${r.final_epochs} epochs · ONNX parity: max diff ${r.parity.max_abs_diff.toExponential(1)}, decoded text identical on ${r.parity.cells} cells · ${r.minutes} min</div></div>
   <table class="table table-vcenter"><tr><th>Field</th><th>Held-out</th><th>Exact</th><th>95% interval</th><th>CER</th><th>Decision</th></tr>${r.fields.map(gateRow).join('')}</table>
   ${r.unlabeled_fields.length?`<div class="tag">No labeled cells, so needs-review: ${r.unlabeled_fields.map(esc).join(', ')}</div>`:''}`}
- $('gbody').innerHTML=h;if(run)setTimeout(gatePoll,4000);else setTimeout(gatePoll,30000)}catch(e){setTimeout(gatePoll,10000)}}
-async function gateStart(){try{await api('/api/train/start',{method:'POST',body:JSON.stringify({target:+$('gt').value,min_n:+$('gn').value})});gatePoll()}catch(e){alert(e.message)}}
+ $('gbody').innerHTML=h;GTIMER=setTimeout(gatePoll,run?4000:30000)}catch(e){GTIMER=setTimeout(gatePoll,10000)}}
+async function gateStart(){try{await api('/api/train/start',{method:'POST',body:JSON.stringify({card:$('gc').value,target:+$('gt').value,min_n:+$('gn').value})});gatePoll()}catch(e){alert(e.message)}}
 
 const TABS=[['cards','Cards'],['label','Label'],['train','Train & Ship'],['history','History'],['ml','Model quality'],['lab','Clean-up lab'],['how','How it works']];
 function tab(t){if(!TABS.some(x=>x[0]===t))t='cards';$('editor').classList.add('hide');$('pview').classList.add('hide');$('home').classList.remove('hide');

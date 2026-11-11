@@ -62,5 +62,5 @@ docs/          screenshots/ (registered in MANIFEST.json), status.json
 
 - Evidence comes from a small labeled set; most fields have under 40 held-out cells, so differences of a few points are noise.
 - The phone app is not part of this repository. Phone-photo accuracy has not been measured on real labeled phone photos.
-- The trainer currently handles ANC-style ruled tables; other card types can be laid out and saved as templates but not yet trained.
+- Any saved template with a grid can be trained once it has labeled cell crops in `studio/cards/<name>/` (see `studio/cards.py`), but Studio does not yet cut or label those cells itself: only the ANC card has that tooling. Match and preprocessing settings in a new card's pack are the ANC values, untuned.
 - License: not chosen yet. Until the maintainers add a `LICENSE` file, all rights are reserved.

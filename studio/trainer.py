@@ -1,7 +1,7 @@
-"""Studio train / gate / export for the ANC card type. Local only.
-Labels (labels.csv + labels_new.csv, new wins) -> page-split 5-fold CV (every labeled cell predicted once by a model that never
+"""Studio train / gate / export for one card type (cards.py says where its labels, crops and template are). Local only.
+Labels (for anc: labels.csv + labels_new.csv, new wins) -> page-split 5-fold CV (every labeled cell predicted once by a model that never
 saw its page) -> gate per field -> final reader trained on ALL pages (epochs fixed from the CV) -> ONNX -> new pack version.
-Usage: python trainer.py RUN_DIR [--target 85] [--min-n 20]   (progress in RUN_DIR/status.json, result in RUN_DIR/results.json)"""
+Usage: python trainer.py RUN_DIR [--card anc] [--target 85] [--min-n 20] [--max-epochs 300]   (progress in RUN_DIR/status.json, result in RUN_DIR/results.json)"""
 import argparse, collections, csv, hashlib, json, random, statistics, sys, time, traceback
 from multiprocessing import Pool
 from pathlib import Path
@@ -9,26 +9,18 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "work_phaseA")); sys.path.insert(0, str(ROOT / "cardpack")); sys.path.insert(0, str(HERE))
-import corrections, provenance
+import cards, provenance
 CFG = "light_lr3e-4"          # chosen on val in Phase A (selection.json)
 SEED = 20261103
 
 
-def merge_labels(out):
-    """labels.csv, labels_new.csv, then labels imported from phones / Label Studio (corrections.py); later wins on conflict.
-    Imported phone labels carry their own crop (absolute path in the `crop` column); the rest use work/crops."""
-    work = ROOT / "work"; cells = {}
-    for f in ("labels.csv", "labels_new.csv"):
-        p = work / f
-        if p.exists():
-            for r in csv.DictReader(open(p, newline="")):
-                cells[(r["page"], r["row"], r["col"])] = (r["label"], "")
-    for r in corrections.read_imported():
-        crop = str(corrections.IMPORTS / r["crop"]) if r["crop"] else ""
-        cells[(r["page"], r["row"], r["col"])] = (r["label"], crop)
-    rows = [{"page": k[0], "row": k[1], "col": k[2], "label": v[0], "crop": v[1]} for k, v in sorted(cells.items()) if v[0].strip() != ""]
+def merge_labels(out, card=cards.LEGACY, dropped=None):
+    """All labels for the card (cards.labels: later sources win, imports from phones / Label Studio included) written to `out`.
+    A row with a `crop` path is read from there; anc rows without one use work/crops. `dropped` receives the counts of rows left out."""
+    rows, problems = cards.labels(card)
     with open(out, "w", newline="") as fh:
         w = csv.DictWriter(fh, ["page", "row", "col", "label", "crop"]); w.writeheader(); w.writerows(rows)
+    if dropped is not None: dropped.update(problems)
     return rows
 
 
@@ -48,15 +40,15 @@ def make_folds(rows, k=5, tries=4000):
 
 
 def cv_job(a):
-    fold, folds, merged, = a
+    fold, folds, merged, card, max_epochs = a
     import torch; import common as C, train as T
-    torch.set_num_threads(2)
+    torch.set_num_threads(2); C.use_fields(cards.masks(card))
     rows = C.read_labels(merged); pre = torch.load(ROOT / "work_phaseA" / "pretrained.pt")
     test_pages = set(folds[fold]); rest = sorted({r["page"] for r in rows} - test_pages)
     vp = set(random.Random(1000 + fold).sample(rest, max(4, round(len(rest) / 7))))
     tr = [r for r in rows if r["page"] in rest and r["page"] not in vp]; va = [r for r in rows if r["page"] in vp]; te = [r for r in rows if r["page"] in test_pages]
     assert not ({r["page"] for r in tr + va} & test_pages)
-    m, info = T.finetune(pre, tr, va, T.CONFIGS[CFG], seed=0, log=lambda *_: None)
+    m, info = T.finetune(pre, tr, va, T.CONFIGS[CFG], seed=0, max_epochs=max_epochs, log=lambda *_: None)
     out = [dict(page=r["page"], row=r["row"], col=r["col"], label=r["label"], pred=p, conf=c) for (p, c), r in zip(T.predict_torch(m, te), te)]
     return fold, out, info["best_epoch"], info.get("hist", [])
 
@@ -96,20 +88,24 @@ def metrics(recs):
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("run_dir"); ap.add_argument("--target", type=float, default=85.0); ap.add_argument("--min-n", type=int, default=20)
+    ap.add_argument("--card", default=cards.LEGACY); ap.add_argument("--max-epochs", type=int, default=300, help="cap per CV fold (lower only for a quick trial)")
     a = ap.parse_args(); run = Path(a.run_dir); run.mkdir(parents=True, exist_ok=True); t0 = time.time()
     def status(stage, detail="", **kw):
-        json.dump(dict(stage=stage, detail=detail, elapsed=round(time.time() - t0), target=a.target, min_n=a.min_n, **kw), open(run / "status.json", "w"))
+        json.dump(dict(stage=stage, detail=detail, elapsed=round(time.time() - t0), target=a.target, min_n=a.min_n, card=a.card, **kw), open(run / "status.json", "w"))
     try:
         status("labels", "merging labels")
-        merged = run / "merged_labels.csv"; rows = merge_labels(merged)
-        pages = sorted({r["page"] for r in rows}); folds = make_folds(rows)
+        if not cards.exists(a.card): raise ValueError(f"no such card: {a.card}")
+        merged = run / "merged_labels.csv"; dropped = {}; rows = merge_labels(merged, a.card, dropped)
+        pages = sorted({r["page"] for r in rows})
+        if len(pages) < cards.MIN_PAGES: raise ValueError(f"{len(rows)} labeled cells on {len(pages)} page(s): training needs at least {cards.MIN_PAGES} labeled pages")
+        folds = make_folds(rows)
         assert sorted(sum(folds, [])) == pages and all(not set(folds[i]) & set(folds[j]) for i in range(5) for j in range(i))
         split_bytes = json.dumps({"seed": SEED, "unit": "page", "folds": folds}, sort_keys=True).encode()
         (run / "folds.json").write_bytes(split_bytes)
         status("cv", f"{len(rows)} labeled cells, {len(pages)} pages; 0 of 5 folds done", cv_done=0)
         preds, bests, curves = [], [], []
         with Pool(5) as pool:
-            for fold, out, best, hist in pool.imap_unordered(cv_job, [(f, folds, str(merged)) for f in range(5)]):
+            for fold, out, best, hist in pool.imap_unordered(cv_job, [(f, folds, str(merged), a.card, a.max_epochs) for f in range(5)]):
                 preds += out; bests.append(best); curves.append({"fold": fold, "best_epoch": best, "history": hist})
                 status("cv", f"{len(bests)} of 5 folds done", cv_done=len(bests))
         assert len(preds) == len(rows) and len({(p["page"], p["row"], p["col"]) for p in preds}) == len(rows)
@@ -117,6 +113,7 @@ def main():
         epochs = int(statistics.median(bests))
         status("final", f"training the reader on all {len(pages)} pages for {epochs} epochs (median best epoch of the folds)", cv_done=5)
         import torch, common as C, train as T
+        C.use_fields(cards.masks(a.card))
         pre = torch.load(ROOT / "work_phaseA" / "pretrained.pt")
         model = train_fixed(pre, C.read_labels(merged), epochs); model.eval()
         status("export", "ONNX export and parity check")
@@ -134,8 +131,7 @@ def main():
 
         # ---- gate + pack
         import cardpack as cp
-        base_path = max((ROOT / "cardpack" / "out").glob("anc_v*.cardpack"), key=lambda p: int(p.stem.split("_v")[1]))
-        mem = cp.read(base_path); man = json.loads(mem["manifest.json"]); fld = json.loads(mem["fields.json"])
+        mem = cards.base_members(a.card); man = json.loads(mem["manifest.json"]); fld = json.loads(mem["fields.json"])
         gate = {}
         for f in fld["fields"]:
             m = cv.get(f["key"]); lo_pct = m["lo"] * 100 if m else None
@@ -147,7 +143,7 @@ def main():
         man["version"] = man["version"] + 1; man["created"] = time.strftime("%Y-%m-%d")
         # photo normalization: gray-level reference from the scans the reader was just trained on. contrast_match was the best
         # option on held-out pages for the phone-photo conditions tested (see CARDPACK.md); without enough scans keep today's flatten.
-        scans = [ROOT / "work" / "aligned" / f"{pg}.png" for pg in sorted(pages) if (ROOT / "work" / "aligned" / f"{pg}.png").exists()]
+        scans = [p for p in (cards.aligned_dir(a.card) / f"{pg}.png" for pg in sorted(pages)) if p.exists()]
         if len(scans) >= 10:
             mean, std = cp.scan_reference(scans)
             man["preprocess"]["normalize"] = {"default": "contrast_match", "reference": {"mean": mean, "std": std, "source": f"gray mean/std over {len(scans)} aligned scans the reader was trained on"}}
@@ -160,14 +156,15 @@ def main():
                                       "per_field": {k: dict(n=v["n"], correct=v["k"], ci95=[round(v["lo"], 4), round(v["hi"], 4)]) for k, v in cv.items()}}}
         mem["reader.onnx"] = onnx_path.read_bytes(); mem["fields.json"] = json.dumps(fld, indent=1, ensure_ascii=False).encode()
         man["files"] = {n: cp.sha256(mem[n]) for n in cp.HASHED}; mem["manifest.json"] = json.dumps(man, indent=1).encode()
-        out_pack = ROOT / "cardpack" / "out" / f"{man['id']}_v{man['version']}.cardpack"; cp.build(mem, out_pack)
+        out_pack = cards.PACKS / f"{man['id']}_v{man['version']}.cardpack"; out_pack.parent.mkdir(parents=True, exist_ok=True); cp.build(mem, out_pack)
         errs = cp.validate(out_pack)
-        res = dict(config=CFG, target=a.target, min_n=a.min_n, n_cells=len(rows), n_pages=len(pages), folds=[len(f) for f in folds], best_epochs=sorted(bests),
+        crops_note = "stored gray crops (work/crops) or imported crops" if a.card == cards.LEGACY else f"stored gray crops (studio/cards/{a.card}/crops) or imported crops"
+        res = dict(card=a.card, dropped_labels=dropped, config=CFG, target=a.target, min_n=a.min_n, n_cells=len(rows), n_pages=len(pages), folds=[len(f) for f in folds], best_epochs=sorted(bests),
                    final_epochs=epochs, cv_all=overall, parity=parity, minutes=round((time.time() - t0) / 60, 1),
                    fields=[dict(field=k, **v, status=gate.get(k, ("needs-review", ""))[0], reason=gate.get(k, ("", ""))[1]) for k, v in sorted(cv.items(), key=lambda kv: -kv[1]["n"])],
                    unlabeled_fields=[f["key"] for f in fld["fields"] if f["key"] not in cv],
                    pack=dict(path=str(out_pack), id=man["id"], version=man["version"], validation_errors=errs, shipped=[k for k, v in gate.items() if v[0] == "ship"]),
-                   provenance=provenance.collect(merged, rows, SEED, CFG, hashlib.sha256(split_bytes).hexdigest(), "stored gray crops (work/crops) or imported crops, no line removal; page normalization not applied at training time"))
+                   provenance=provenance.collect(merged, rows, SEED, CFG, hashlib.sha256(split_bytes).hexdigest(), crops_note + ", no line removal; page normalization not applied at training time"))
         json.dump(res, open(run / "results.json", "w"), indent=1)
         json.dump(preds, open(run / "cv_predictions.json", "w"))
         json.dump({"note": "per-epoch history of each CV fold (loss, validation exact match and CER on that fold's 7 or so validation pages)", "folds": sorted(curves, key=lambda c: c["fold"])}, open(run / "history.json", "w"))

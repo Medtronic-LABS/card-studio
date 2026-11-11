@@ -10,6 +10,7 @@ CASES = HERE.parent / "cardpack" / "dart_check" / "normalization_cases.json"
 SCAN = HERE.parent / "work" / "raw" / "p-000.png"
 PACKS = HERE.parent / "cardpack" / "out"
 HAVE = SCAN.exists() and (PACKS / "anc_v5.cardpack").exists() and (PACKS / "anc_v3.cardpack").exists()
+NEWEST = "anc v%d" % max([int(p.stem.split("_v")[1]) for p in PACKS.glob("anc_v*.cardpack")] or [0])   # auto picks the newest pack on ties
 
 
 @unittest.skipUnless(CASES.exists(), "run cardpack/dart_check/make_normalization_cases.py first")
@@ -64,7 +65,7 @@ class Lab(unittest.TestCase):
 
     def test_auto_picks_newest_on_ties_and_runs_every_method(self):
         rep = self.L.analyze(self.photo, self.tmp.name, packs=self.packs)
-        self.assertEqual(rep["pack"], "anc v5"); self.assertGreater(rep["inliers"], 100)
+        self.assertEqual(rep["pack"], NEWEST); self.assertGreater(rep["inliers"], 100)
         self.assertEqual([m["method"] for m in rep["methods"]], list(N.METHODS)); self.assertTrue(all(m["available"] for m in rep["methods"]))
         self.assertGreater(min(m["read"] for m in rep["methods"]), 40)
         for m in rep["methods"]: self.assertTrue((Path(self.tmp.name) / f"{rep['id']}_{m['method']}.png").exists())
@@ -116,7 +117,7 @@ class Endpoint(unittest.TestCase):
     def test_cleanup_round_trip(self):
         png = cv2.imencode(".png", cv2.imread(str(SCAN)))[1].tobytes()
         st, d, _ = self.call("POST", "/api/cleanup", png, {"X-Card-Studio": "1"}); self.assertEqual(st, 200, d[:200])
-        rep = json.loads(d); self.assertEqual(rep["pack"], "anc v5")
+        rep = json.loads(d); self.assertEqual(rep["pack"], NEWEST)
         st, img, ct = self.call("GET", rep["methods"][0]["image"]); self.assertEqual((st, ct), (200, "image/png")); self.assertTrue(img.startswith(b"\x89PNG"))
         self.assertEqual(self.call("GET", "/api/cleanup/" + "0" * 32 + "/none.png")[0], 404)
         self.assertEqual(self.call("POST", "/api/cleanup", b"x")[0], 403)                                     # needs the guard header (small body: the server refuses before reading it)

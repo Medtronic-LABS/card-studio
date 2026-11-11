@@ -1,19 +1,19 @@
 {
- "captured": "2026-11-06",
+ "captured": "2026-11-11",
  "mode": "?shots=1 (no patient images are built)",
  "screenshots": [
   {
    "file": "docs/screenshots/dashboard.png",
    "view": "dashboard",
    "caption": "Dashboard: model registry, getting started, activity, needs attention, field readiness",
-   "sha256": "4371bc4507732162596b6c6f6fe9cb80c18343ee4aee106256b5ad82334bcd68",
+   "sha256": "16abfb625ffa3108e02a249983800e00bea328a8aea7a1123088c32cac4b9451",
    "images_on_page": 0
   },
   {
    "file": "docs/screenshots/model-quality.png",
    "view": "model-quality",
    "caption": "Model quality: per-field errors, calibration, risk-coverage, confusions, flag-policy tuner, provenance",
-   "sha256": "6f2f9653aee97369d28ea696de52a0d83a65f58f0fb299dfc9c229f2d5db2482",
+   "sha256": "2d74e77965226eb2a48aa2ccf3a6fcf431c57f63b1bfda9078957f5ee2cc55cf",
    "images_on_page": 0
   },
   {
@@ -27,7 +27,7 @@
    "file": "docs/screenshots/train-and-ship.png",
    "view": "train-and-ship",
    "caption": "Train and ship: held-out gate per field",
-   "sha256": "055d789135a8003814eb744b65230317e0993580bd3d87330f4fae32564cf5fc",
+   "sha256": "fa41b34ecaf5eb03014af801bb1f652715017d1942309a3b9fd13255490edc41",
    "images_on_page": 0
   },
   {

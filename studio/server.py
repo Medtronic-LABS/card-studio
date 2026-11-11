@@ -8,7 +8,7 @@ import cv2
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cardpack"))
 import cardpack as cp
 from detect import detect_layout, load_normalized, match_score
-import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance
+import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards
 from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
@@ -153,14 +153,19 @@ def start_training(req):
     global _proc
     if _proc is not None and _proc.poll() is None:
         raise ValueError("a training run is already in progress")
-    target, min_n = float(req.get("target", 85)), int(req.get("min_n", 20))
+    target, min_n, card = float(req.get("target", 85)), int(req.get("min_n", 20)), str(req.get("card", cards.LEGACY))
     if not (50 <= target <= 100) or not (1 <= min_n <= 1000):
         raise ValueError("target must be 50-100 and min_n 1-1000")
+    if not cards.exists(card):
+        raise ValueError("no such card")
+    c = cards.describe(card)
+    if not c["trainable"]:
+        raise ValueError(f"{card} cannot be trained yet: {c['blocker']}")
     d = RUNS / time.strftime("run-%Y%m%d-%H%M%S"); d.mkdir(parents=True)
-    json.dump({"stage": "labels", "detail": "starting", "elapsed": 0, "target": target, "min_n": min_n}, open(d / "status.json", "w"))
-    _proc = subprocess.Popen([sys.executable, str(HERE / "trainer.py"), str(d), "--target", str(target), "--min-n", str(min_n)],
+    json.dump({"stage": "labels", "detail": "starting", "elapsed": 0, "target": target, "min_n": min_n, "card": card}, open(d / "status.json", "w"))
+    _proc = subprocess.Popen([sys.executable, str(HERE / "trainer.py"), str(d), "--card", card, "--target", str(target), "--min-n", str(min_n)],
                              stdout=open(d / "log.txt", "w"), stderr=subprocess.STDOUT, cwd=str(HERE))
-    return {"run": d.name}
+    return {"run": d.name, "card": card}
 
 
 MAX_EPOCHS = 300
@@ -293,6 +298,7 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, experiments.load(p.rsplit("/", 1)[1]))
             except KeyError as e: return self._err(404, str(e).strip("'\""))
             except ValueError as e: return self._err(400, str(e))
+        if p == "/api/cards": return self._send(200, cards.list_cards())
         if p == "/api/runs": return self._send(200, history.list_runs())
         if p == "/api/runs/compare":
             q = parse_qs(urlparse(self.path).query)

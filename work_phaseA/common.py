@@ -41,6 +41,11 @@ def mask_t(field):
     return torch.from_numpy(mask_np(field))
 
 
+def use_fields(allowed):
+    """Train or decode another card type: replace the field masks ({field key: allowed class indices}). The class list stays the same."""
+    FIELD_ALLOWED.clear(); FIELD_ALLOWED.update({k: sorted(v) for k, v in allowed.items()}); _masks.clear()
+
+
 def read_labels(path):
     rows = [r for r in csv.DictReader(open(path)) if r["label"].strip() != ""]
     for r in rows:

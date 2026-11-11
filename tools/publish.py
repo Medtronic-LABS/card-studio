@@ -21,6 +21,7 @@ data/
 studio/runs/
 studio/uploads/
 studio/templates/
+studio/cards/
 studio/imports/
 studio/experiments/
 cardpack/out/
