@@ -1,14 +1,14 @@
 {
  "updated": "2026-11-11",
  "card_types": 1,
- "pack_versions": 4,
+ "pack_versions": 5,
  "templates": 4,
  "labeled_cells": 369,
  "labeled_pages": 49,
  "runs": 2,
  "experiments": 4,
  "best_pack": {
-  "name": "anc v6",
+  "name": "anc v7",
   "shipped": 3,
   "fields": 22
  },

@@ -59,7 +59,22 @@ _Aggregate numbers from the author's own labeled data, updated 2026-11-11. Held-
 | **Training recipe** (`work_phaseA/`) | CRNN + CTC reader (about 538k parameters), page-level splits, field-masked decoding, Wilson intervals. |
 | **Tools** (`tools/`) | The leak check, screenshot capture, README generator and publish script. |
 
-Studio tabs: **Dashboard** (model registry, getting started, activity, what needs attention), **Label** (set each field's kind, then type what each cut cell says, one cell at a time from the keyboard; optionally send the cells to a local [Label Studio](https://labelstud.io) and pull its labels back; import corrected labels), **Train & Ship** (held-out gate per field), **History** (runs, paired comparison, experiments), **Model quality** (failure browser, calibration, risk-coverage, confusions, flag-policy tuner, provenance), **Clean-up lab** (try each photo clean-up on one photo).
+Studio tabs: **Dashboard** (model registry, getting started, activity, what needs attention), **Label** (set each field's kind, then type what each cut cell says, one cell at a time from the keyboard; optionally send the cells to a local [Label Studio](https://labelstud.io) and pull its labels back; import corrected labels), **Train & Ship** (held-out gate per field), **History** (runs, paired comparison, experiments), **Model quality** (failure browser, calibration, risk-coverage, confusions, flag-policy tuner, provenance), **Clean-up lab** (try each photo clean-up on one photo), **How to use** (these steps, and how the reader works).
+
+## How to use
+
+From a new card to a model on the phone. Start Studio with `python studio/server.py` and open http://127.0.0.1:8770. The same steps are on the **How to use** tab.
+
+1. **Add the card type** (Cards tab). Under **Add a new card type**, drop one clean, flat picture of the card. Use the same kind of capture as the cards you will read later: a scan for scans, a phone photo for phone photos. Turn it the right way up, fix the detected cells, and give a name to the cell that labels each field (the label at the left of a row, or the heading above a column). Approve and save the template.
+2. **Save its grid** (Cards tab). In **Layouts**, press **Grid**. Say whether each field is a row (a column per visit, like ANC and EPI cards) or a column (a row per visit, like the NCD card). Skip printed label columns and heading rows until the boxes in the preview sit exactly on the cells people write in, then save.
+3. **Add filled cards** (Cards tab). In **Filled scans**, leave the card on Auto-identify and add your scans, photos or a PDF. Each one is matched to its template, straightened and cut into cells. Open **Scans** and press **View grid** on anything marked *check*. A scan that matches no template is refused, not guessed.
+4. **Set each field's kind** (Label tab). Pick the card, then choose a kind for every field: number, date, bp, mark or text, and an expected range for numbers. Do this before labeling: the kind decides which characters the reader may produce.
+5. **Label the cells** (Label tab). Press **Label** on a field and type what each cell says. Enter saves and moves on, Ctrl+B means nothing is written, Ctrl+U means it cannot be read. Training needs labels on at least 10 pages; more pages and more writers give a better reader. To share the work, send the cells to Label Studio from the strip below the table and pull the labels back.
+6. **Train and check** (Train & Ship tab). Choose the card and press **Train + gate + export**. Every labeled cell is read once by a model that never saw its page. A field ships only if the low end of its 95% interval meets the target; the rest stay needs-review.
+7. **Take the model** (Cards tab). In **Model registry**, press **View** on the new pack. Download the pack (template, grid, field rules, and the reader as ONNX and TensorFlow Lite), or only **reader.tflite**.
+8. **Improve it** (Model quality tab). Look at which fields and which mistakes are worst, label more of those, train again, and compare the two runs in History.
+
+From the command line: `python studio/scans.py add auto FOLDER` adds a large batch of scans, `python studio/labelstudio.py start` runs the optional Label Studio, and `python studio/tflite_export.py add PACK.cardpack` adds a TensorFlow Lite reader to an existing pack.
 
 ## How "good" is decided
 
@@ -74,7 +89,7 @@ python -m venv studio/.venv-tflite && studio/.venv-tflite/bin/pip install tensor
 python studio/server.py                                        # http://127.0.0.1:8770
 ```
 
-Studio starts empty on a fresh clone: it needs a card pack in `cardpack/out/` and, for training, your own labeled crops. A small synthetic pack for tests lives in `cardpack/synthetic.py`.
+Studio starts empty on a fresh clone: follow How to use above with your own cards. A small synthetic pack for tests lives in `cardpack/synthetic.py`.
 
 ```sh
 CARDPACK_SYNTHETIC=1 python cardpack/test_cardpack.py          # pack format
