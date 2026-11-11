@@ -59,7 +59,7 @@ _Aggregate numbers from the author's own labeled data, updated 2026-11-11. Held-
 | **Training recipe** (`work_phaseA/`) | CRNN + CTC reader (about 538k parameters), page-level splits, field-masked decoding, Wilson intervals. |
 | **Tools** (`tools/`) | The leak check, screenshot capture, README generator and publish script. |
 
-Studio tabs: **Dashboard** (model registry, getting started, activity, what needs attention), **Label** (import corrected labels), **Train & Ship** (held-out gate per field), **History** (runs, paired comparison, experiments), **Model quality** (failure browser, calibration, risk-coverage, confusions, flag-policy tuner, provenance), **Clean-up lab** (try each photo clean-up on one photo).
+Studio tabs: **Dashboard** (model registry, getting started, activity, what needs attention), **Label** (set each field's kind, then type what each cut cell says, one cell at a time from the keyboard; import corrected labels), **Train & Ship** (held-out gate per field), **History** (runs, paired comparison, experiments), **Model quality** (failure browser, calibration, risk-coverage, confusions, flag-policy tuner, provenance), **Clean-up lab** (try each photo clean-up on one photo).
 
 ## How "good" is decided
 
@@ -100,7 +100,7 @@ docs/          screenshots/ (registered in MANIFEST.json), status.json
 
 - Evidence comes from a small labeled set; most fields have under 40 held-out cells, so differences of a few points are noise.
 - The phone app is not part of this repository. Phone-photo accuracy has not been measured on real labeled phone photos.
-- Any saved template with a grid can take filled scans (`studio/scans.py`, or Filled scans on the Cards tab) and be trained once its cells are labeled, but Studio has no labeling screen for new cards yet: labels go in `studio/cards/<name>/labels.csv` by hand. Only the ANC card has a labeler. Match and preprocessing settings in a new card's pack are the ANC values, untuned.
+- A new card's pack copies the ANC card's matching and photo clean-up settings; they have not been tuned on other cards. The reader reads one line of writing left to right, so cells written on two lines (a date stacked over its year, a blood pressure split by a diagonal) are likely to read badly.
 - A grid can run either way: one field per row with a column per visit (`ruled-columns-v1`), or one visit per row with a column per field (`ruled-rows-v1`). Studio cuts, trains and packs both; the phone app only reads the first so far.
 - A template should come from the same kind of capture as the scans it will match: a colour phone photo used as the template did not match photocopied scans of the same card.
 - License: not chosen yet. Until the maintainers add a `LICENSE` file, all rights are reserved.

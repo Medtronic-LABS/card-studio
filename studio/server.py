@@ -8,7 +8,7 @@ import cv2
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cardpack"))
 import cardpack as cp
 from detect import detect_layout, load_normalized, match_score
-import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans
+import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling
 from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
@@ -308,6 +308,18 @@ class H(BaseHTTPRequestHandler):
             except ValueError as e: return self._err(400, str(e))
         if p == "/api/cards": return self._send(200, cards.list_cards())
         if p == "/api/scans": return self._send(200, scans.summaries())
+        m = re.fullmatch(r"/api/card/([\w-]{1,40})/(labeling|labeling/queue)", p)
+        if m:
+            try:
+                if m[2] == "labeling": return self._send(200, labeling.overview(m[1]))
+                q = parse_qs(urlparse(self.path).query); g = lambda k, d=None: q.get(k, [d])[0]
+                return self._send(200, labeling.queue(m[1], g("field") or None, g("show", "todo"), int(g("limit", "60")), g("after")))
+            except KeyError as e: return self._err(404, str(e).strip("'\""))
+            except ValueError as e: return self._err(400, str(e))
+        m = re.fullmatch(r"/api/card/([\w-]{1,40})/crop/(\w{1,40})/(c\d{1,2})/([\w-]{1,40})\.png", p)
+        if m:
+            try: return self._send(200, labeling.crop_path(m[1], m[2], m[3], m[4]).read_bytes(), "image/png")
+            except KeyError as e: return self._err(404, str(e).strip("'\""))
         m = re.fullmatch(r"/api/card/([\w-]{1,40})/scan/([\w-]{1,40})\.png", p)
         if m:
             try: return self._send(200, scans.overlay(m[1], m[2]), "image/png")
@@ -376,6 +388,12 @@ class H(BaseHTTPRequestHandler):
                 q = parse_qs(urlparse(self.path).query); card = q.get("card", [scans.AUTO])[0]
                 if card != scans.AUTO and not cards.NAME.match(card): raise ValueError("bad card name")
                 return self._send(200, {"results": scans.add(card, body, Path(q.get("name", ["scan"])[0]).name[:120])})
+            m = re.fullmatch(r"/api/card/([\w-]{1,40})/(label|label/clear|field)", self.path)
+            if m:
+                r = json.loads(body or b"{}"); cell = (str(r.get("page", "")), str(r.get("field", "")), str(r.get("visit", "")))
+                if m[2] == "label": return self._send(200, labeling.save(m[1], *cell, str(r.get("label", "")), str(r.get("note", "")), bool(r.get("confirm"))))
+                if m[2] == "label/clear": return self._send(200, labeling.clear(m[1], *cell))
+                return self._send(200, labeling.set_field(m[1], str(r.get("key", "")), str(r.get("kind", "")), r.get("range")))
             m = re.fullmatch(r"/api/card/([\w-]{1,40})/(recut|scan/delete)", self.path)
             if m: return self._send(200, scans.recut(m[1]) if m[2] == "recut" else scans.remove(m[1], str(json.loads(body or b"{}").get("page", ""))))
             if self.path == "/api/import/corrections": return self._send(200, corrections.import_phone_zip(body))

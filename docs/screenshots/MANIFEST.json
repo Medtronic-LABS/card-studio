@@ -6,14 +6,14 @@
    "file": "docs/screenshots/dashboard.png",
    "view": "dashboard",
    "caption": "Dashboard: model registry, getting started, activity, needs attention, field readiness",
-   "sha256": "0ee6b7e115f384eb1c123e9389195676d79d68383fba3b69a56773a24b49d36c",
+   "sha256": "265ec18981866a8df5580e24018b388f6a1860d7560bd0b892e5b460ed2124fb",
    "images_on_page": 0
   },
   {
    "file": "docs/screenshots/model-quality.png",
    "view": "model-quality",
    "caption": "Model quality: per-field errors, calibration, risk-coverage, confusions, flag-policy tuner, provenance",
-   "sha256": "4dd16b3eadcdc09aff641c511b74887fc3b5c718dc59115e70556d101a558279",
+   "sha256": "c738d0ebe8af1e93a7e84bc0a3d8b24e1c4c5eaccf522cea4e798a4ee04906a1",
    "images_on_page": 0
   },
   {
@@ -41,7 +41,7 @@
    "file": "docs/screenshots/label.png",
    "view": "label",
    "caption": "Label and import corrected labels",
-   "sha256": "0202a05f70092482177cd53730b1f7a35fd9be8302da3128fecb6ffb246db298",
+   "sha256": "c63a73a8c234a6cbbd31c0b7730faeea791634956d3f684d0ec2e9508cfd5d1f",
    "images_on_page": 0
   }
  ]
