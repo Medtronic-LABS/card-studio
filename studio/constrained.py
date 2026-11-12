@@ -43,6 +43,12 @@ _cache = {}
 
 def candidates(kind, rng=None, years=None):
     """Every string the grammar allows for this kind of field (rng: a number's [low, high]; years: a date's [first, last] two-digit year). Cached."""
+    import grammar
+    return grammar.candidates(kind, rng, years)
+
+
+def _candidates_unsorted(kind, rng=None, years=None):
+    """The original enumeration, kept so a test can check grammar.candidates holds the same strings."""
     years = tuple(years) if years else YEARS; key = (kind, tuple(rng) if rng else None, years if kind == "date" else None)
     if key in _cache: return _cache[key]
     if kind == "date":
@@ -74,11 +80,12 @@ def score(logits, allowed, cands, batch=3000):
 
 
 def decode(logits, allowed, kind, rng=None, years=None):
-    """-> (best string, margin). margin = log-likelihood of the winner minus that of the unconstrained greedy path (>= 0 means the grammar agreed;
-    the more negative, the more the grammar had to overrule the reader). logits: [T, classes], allowed: class indices the field may emit."""
-    cands = candidates(kind, rng, years); s = score(logits, allowed, cands); b = int(s.argmax())
-    greedy = _masked_logp(logits, allowed).max(1).sum()          # log-probability of the single best path: an upper bound on any string's likelihood
-    return cands[b], float(s[b] - greedy)
+    """-> (best string, margin). margin = log-likelihood of the winner minus the log-probability of the single best unconstrained path (a string's likelihood sums over
+    every alignment, so margin can be above 0 when many alignments agree; the more negative, the more the grammar had to overrule the reader). logits: [T, classes], allowed: class indices the field may emit.
+    Runs grammar.py, the reference implementation (numpy only: no torch, no model); `score` below is the torch cross-check of it."""
+    import grammar
+    m = cards.meta(); idx = list(allowed); chars = [m["classes"][i] for i in idx]; blank = idx.index(m["blank_idx"])
+    return grammar.decode(np.asarray(logits)[:, idx], chars, blank, kind, rng, years)
 
 
 # ---------------------------------------------------------------- experiment

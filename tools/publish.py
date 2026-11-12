@@ -13,7 +13,7 @@ DST = ROOT / ".dist" / "public-repo"
 REPO = "Medtronic-LABS/card-studio"
 DESC = "Local-first platform for reading handwritten health cards: Card Studio, a portable card-pack format, and held-out evaluation. Code and docs only; no patient data."
 INCLUDE = ["model_meta.json", "studio/*.py", "studio/tests/*.py", "studio/static/index.html", "studio/static/vendor/tabler.min.css", "studio/static/vendor/TABLER-LICENSE.txt",
-           "cardpack/CARDPACK.md", "cardpack/*.py", "cardpack/schema/*.json", "work_phaseA/*.py", "tools/*.py", "tools/README.template.md",
+           "cardpack/CARDPACK.md", "cardpack/*.py", "cardpack/schema/*.json", "cardpack/reference/*.py", "cardpack/reference/*.dart", "cardpack/reference/grammar_vectors.json", "work_phaseA/*.py", "tools/*.py", "tools/README.template.md",
            "docs/screenshots/*.png", "docs/screenshots/MANIFEST.json", "docs/status.json"]
 GITIGNORE = """# Patient data and anything derived from it: never commit. This protects your own data if you run Studio here.
 work/
@@ -23,6 +23,8 @@ studio/uploads/
 studio/templates/
 studio/cards/
 studio/curves/
+studio/pretrained/
+studio/capacity/
 studio/.venv-labelstudio/
 studio/.venv-tflite/
 studio/labelstudio.json
@@ -68,6 +70,7 @@ jobs:
       - run: pip install numpy opencv-python-headless onnxruntime pillow pypdfium2 jsonschema
       - run: python tools/leakcheck.py .
       - run: CARDPACK_SYNTHETIC=1 python cardpack/test_cardpack.py
+      - run: python cardpack/test_grammar.py
       - run: python -m unittest discover -s studio/tests
       - run: python -m unittest discover -s tools -p "test_*.py"
 """
@@ -113,7 +116,7 @@ def main():
     if r.returncode: sys.exit("STOPPED: the leak check found something. Nothing was committed or pushed.")
     if not a.skip_tests:
         env = {**os.environ, "CARDPACK_SYNTHETIC": "1"}
-        for name, cmd in (("pack format", [sys.executable, "cardpack/test_cardpack.py"]), ("studio", [sys.executable, "-m", "unittest", "discover", "-s", "studio/tests"]),
+        for name, cmd in (("pack format", [sys.executable, "cardpack/test_cardpack.py"]), ("grammar", [sys.executable, "cardpack/test_grammar.py"]), ("studio", [sys.executable, "-m", "unittest", "discover", "-s", "studio/tests"]),
                           ("tools", [sys.executable, "-m", "unittest", "discover", "-s", "tools", "-p", "test_*.py"])):
             r = run(cmd, cwd=DST, env=env); tail = (r.stderr or r.stdout).strip().splitlines()[-3:]
             print(f"tests [{name}]: {'OK' if r.returncode == 0 else 'FAILED'}  {' | '.join(tail)}")

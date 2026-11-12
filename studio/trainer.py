@@ -1,7 +1,7 @@
 """Studio train / gate / export for one card type (cards.py says where its labels, crops and template are). Local only.
 Labels (for anc: labels.csv + labels_new.csv, new wins) -> page-split 5-fold CV (every labeled cell predicted once by a model that never
 saw its page) -> gate per field -> final reader trained on ALL pages (epochs fixed from the CV) -> ONNX -> new pack version.
-Usage: python trainer.py RUN_DIR [--card anc] [--target 85] [--min-n 20] [--max-epochs 300]   (progress in RUN_DIR/status.json, result in RUN_DIR/results.json)"""
+Usage: python trainer.py RUN_DIR [--card anc] [--target 85] [--min-n 20] [--max-epochs 300] [--pretrained auto|legacy|NAME]   (progress in RUN_DIR/status.json, result in RUN_DIR/results.json)"""
 import argparse, collections, csv, hashlib, json, random, statistics, sys, time, traceback
 from multiprocessing import Pool
 from pathlib import Path
@@ -9,7 +9,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "work_phaseA")); sys.path.insert(0, str(ROOT / "cardpack")); sys.path.insert(0, str(HERE))
-import cards, constrained, provenance, subcells
+import cards, constrained, pretrained, provenance, subcells
 CFG = "light_lr3e-4"          # chosen on val in Phase A (selection.json)
 SEED = 20261103
 
@@ -51,10 +51,10 @@ def grammar_spec(card):
 
 
 def cv_job(a):
-    fold, folds, merged, card, max_epochs, gspec = a
+    fold, folds, merged, card, max_epochs, gspec, weights = a
     import torch; import common as C, train as T
     torch.set_num_threads(2); C.use_fields(cards.masks(card))
-    rows = C.read_labels(merged); pre = torch.load(ROOT / "work_phaseA" / "pretrained.pt")
+    rows = C.read_labels(merged); pre = torch.load(weights)
     test_pages = set(folds[fold]); rest = sorted({r["page"] for r in rows} - test_pages)
     vp = set(random.Random(1000 + fold).sample(rest, max(4, round(len(rest) / 7))))
     tr = [r for r in rows if r["page"] in rest and r["page"] not in vp]; va = [r for r in rows if r["page"] in vp]; te = [r for r in rows if r["page"] in test_pages]
@@ -106,13 +106,15 @@ def metrics(recs):
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("run_dir"); ap.add_argument("--target", type=float, default=85.0); ap.add_argument("--min-n", type=int, default=20)
-    ap.add_argument("--card", default=cards.LEGACY); ap.add_argument("--max-epochs", type=int, default=300, help="cap per CV fold (lower only for a quick trial)")
+    ap.add_argument("--card", default=cards.LEGACY); ap.add_argument("--pretrained", default="auto", help="starting weights: auto (studio/pretrained/DEFAULT, else legacy), legacy, or a name from pretrained.py list"); ap.add_argument("--max-epochs", type=int, default=300, help="cap per CV fold (lower only for a quick trial)")
     a = ap.parse_args(); run = Path(a.run_dir); run.mkdir(parents=True, exist_ok=True); t0 = time.time()
     def status(stage, detail="", **kw):
         json.dump(dict(stage=stage, detail=detail, elapsed=round(time.time() - t0), target=a.target, min_n=a.min_n, card=a.card, **kw), open(run / "status.json", "w"))
     try:
         status("labels", "merging labels")
         if not cards.exists(a.card): raise ValueError(f"no such card: {a.card}")
+        weights, wrec = pretrained.resolve(a.pretrained)            # fails early, with the reason, when the weights cannot be used (torch is not touched here: it is first used inside the workers)
+        status("labels", f"starting weights: {wrec['name']}")
         merged = run / "merged_labels.csv"; dropped = {}; rows = merge_labels(merged, a.card, dropped); layouts = merge_labels.layouts
         whole = {(r["page"], r["row"], r["col"]): r["label"] for r in rows}
         with open(merged, newline="") as fh: n_train = sum(1 for _ in csv.DictReader(fh))
@@ -128,7 +130,7 @@ def main():
         status("cv", f"{len(rows)} labeled cells, {len(pages)} pages; 0 of 5 folds done", cv_done=0)
         preds, bests, curves = [], [], []; gspec = grammar_spec(a.card)
         with Pool(5) as pool:
-            for fold, out, best, hist in pool.imap_unordered(cv_job, [(f, folds, str(merged), a.card, a.max_epochs, gspec) for f in range(5)]):
+            for fold, out, best, hist in pool.imap_unordered(cv_job, [(f, folds, str(merged), a.card, a.max_epochs, gspec, str(weights)) for f in range(5)]):
                 preds += out; bests.append(best); curves.append({"fold": fold, "best_epoch": best, "history": hist})
                 status("cv", f"{len(bests)} of 5 folds done", cv_done=len(bests))
         assert len(preds) == n_train and len({(p["page"], p["row"], p["col"]) for p in preds}) == n_train
@@ -139,7 +141,7 @@ def main():
         status("final", f"training the reader on all {len(pages)} pages for {epochs} epochs (median best epoch of the folds)", cv_done=5)
         import torch, common as C, train as T
         C.use_fields(cards.masks(a.card))
-        pre = torch.load(ROOT / "work_phaseA" / "pretrained.pt")
+        pre = torch.load(weights)
         model = train_fixed(pre, C.read_labels(merged), epochs); model.eval()
         status("export", "ONNX export and parity check")
         import numpy as np, onnxruntime as ort
@@ -200,7 +202,7 @@ def main():
         errs = cp.validate(out_pack)
         crops_note = "stored gray crops (work/crops) or imported crops" if a.card == cards.LEGACY else f"stored gray crops (studio/cards/{a.card}/crops) or imported crops"
         overall_greedy = overall; overall = metrics([dict(p, row="ALL", pred=p["pred_grammar"] if dec.get(p["row"], {}).get("decode") == "grammar" else p["pred"]) for p in preds])["ALL"]
-        res = dict(card=a.card, cv_all_greedy=overall_greedy, decode=dec, split_unit=unit, split_units=n_units, dropped_labels=dropped, config=CFG, target=a.target, min_n=a.min_n, n_cells=len(rows), n_pages=len(pages), folds=[len(f) for f in folds], best_epochs=sorted(bests),
+        res = dict(card=a.card, pretrained={"name": wrec["name"], "sha256": pretrained.sha256(weights)[:16], "images": wrec.get("images"), "epochs": wrec.get("epochs"), "generator": wrec.get("generator")}, cv_all_greedy=overall_greedy, decode=dec, split_unit=unit, split_units=n_units, dropped_labels=dropped, config=CFG, target=a.target, min_n=a.min_n, n_cells=len(rows), n_pages=len(pages), folds=[len(f) for f in folds], best_epochs=sorted(bests),
                    final_epochs=epochs, cv_all=overall, parity=parity, tflite=tfl, minutes=round((time.time() - t0) / 60, 1),
                    fields=[dict(field=k, **v, decode=dec.get(k, {}).get("decode", "greedy"), status=gate.get(k, ("needs-review", ""))[0], reason=gate.get(k, ("", ""))[1]) for k, v in sorted(cv.items(), key=lambda kv: -kv[1]["n"])],
                    unlabeled_fields=[f["key"] for f in fld["fields"] if f["key"] not in cv],

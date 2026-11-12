@@ -21,7 +21,7 @@ Everything runs on one machine and binds to `127.0.0.1` only. There are no cloud
 | **Training recipe** (`work_phaseA/`) | CRNN + CTC reader (about 538k parameters), page-level splits, field-masked decoding, Wilson intervals. |
 | **Tools** (`tools/`) | The leak check, screenshot capture, README generator and publish script. |
 
-Studio tabs: **Dashboard** (model registry, getting started, activity, what needs attention), **Label** (set each field's kind, then type what each cut cell says, one cell at a time from the keyboard, with a trained reader's suggestion to confirm or correct once the card has one; optionally send the cells to a local [Label Studio](https://labelstud.io) and pull its labels back; import corrected labels), **Train & Ship** (held-out gate per field; what each field still needs to pass; a measured learning curve that says roughly how many labeled cells the target would take), **History** (runs, paired comparison, experiment records, and live progress and results of the experiments started from the command line), **Model quality** (failure browser, calibration, risk-coverage, confusions, flag-policy tuner, provenance), **Clean-up lab** (try each photo clean-up on one photo), **How to use** (these steps, and how the reader works).
+Studio tabs: **Dashboard** (model registry, getting started, activity, what needs attention), **Label** (set each field's kind, then type what each cut cell says, one cell at a time from the keyboard, with a trained reader's suggestion to confirm or correct once the card has one; optionally send the cells to a local [Label Studio](https://labelstud.io) and pull its labels back; import corrected labels), **Train & Ship** (choose the starting weights, held-out gate per field; what each field still needs to pass; a measured learning curve that says roughly how many labeled cells the target would take), **History** (runs, paired comparison, experiment records, and live progress and results of the experiments started from the command line), **Model quality** (failure browser, calibration, risk-coverage, confusions, flag-policy tuner, provenance), **Clean-up lab** (try each photo clean-up on one photo), **How to use** (these steps, and how the reader works).
 
 ## How to use
 
@@ -37,6 +37,10 @@ From a new card to a model on the phone. Start Studio with `python studio/server
 8. **Improve it** (Model quality tab). Look at which fields and which mistakes are worst, label more of those, train again, and compare the two runs in History.
 
 From the command line: `python studio/scans.py add auto FOLDER` adds a large batch of scans, `python studio/labelstudio.py start` runs the optional Label Studio, and `python studio/tflite_export.py add PACK.cardpack` adds a TensorFlow Lite reader to an existing pack.
+
+## Starting weights
+
+A reader is pretrained on synthetic cells before it sees your labels. The choice is a dropdown on the Train & Ship tab and is recorded with every run: `legacy` (the original 4,000 stitched digit strings) or weights made by `python studio/pretrained.py make NAME` (synthetic cells drawn on the empty cells of the real cards: grammars, two-line layouts, damage). Held-out results on the ANC card (369 cells, page split) for the same reader: 72% with `legacy` weights against 77% with generator v2 weights (sign test p = 0.006). `python studio/pretrained.py list` shows what is registered; weights for a different class list, or whose file changed, are refused.
 
 ## How "good" is decided
 

@@ -8,7 +8,7 @@ import cv2
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cardpack"))
 import cardpack as cp
 from detect import detect_layout, load_normalized, match_score
-import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize, labruns
+import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize, labruns, pretrained
 from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
@@ -79,7 +79,7 @@ _proc = None  # the one training run this server started
 _curve = None  # the one learning-curve job this server started
 
 
-def start_curve(card, target=85.0):
+def start_curve(card, target=85.0, start="auto"):
     """Start `datasize.py curve` for a card in the background. One heavy job at a time: not while a training run or another curve is going."""
     global _curve
     if (_proc is not None and _proc.poll() is None) or (_curve is not None and _curve.poll() is None):
@@ -87,9 +87,10 @@ def start_curve(card, target=85.0):
     c = cards.describe(card)
     if not c["trainable"]: raise ValueError(f"{card} cannot be trained yet: {c['blocker']}")
     if not (50 <= float(target) <= 100): raise ValueError("target must be 50-100")
+    pretrained.resolve(start)
     d = datasize.CURVES / card; d.mkdir(parents=True, exist_ok=True)
     (d / "status.json").write_text(json.dumps({"stage": "labels", "detail": "starting", "elapsed": 0, "card": card}))
-    _curve = subprocess.Popen([sys.executable, str(HERE / "datasize.py"), "curve", card, "--target", str(float(target))], stdout=open(d / "log.txt", "w"), stderr=subprocess.STDOUT, cwd=str(HERE))
+    _curve = subprocess.Popen([sys.executable, str(HERE / "datasize.py"), "curve", card, "--target", str(float(target)), "--pretrained", start], stdout=open(d / "log.txt", "w"), stderr=subprocess.STDOUT, cwd=str(HERE))
     return {"card": card, "started": True}
 
 
@@ -184,9 +185,11 @@ def start_training(req):
     c = cards.describe(card)
     if not c["trainable"]:
         raise ValueError(f"{card} cannot be trained yet: {c['blocker']}")
+    start = str(req.get("pretrained", "auto"))
+    pretrained.resolve(start)        # raises, saying why, when these starting weights cannot be used
     d = RUNS / time.strftime("run-%Y%m%d-%H%M%S"); d.mkdir(parents=True)
     json.dump({"stage": "labels", "detail": "starting", "elapsed": 0, "target": target, "min_n": min_n, "card": card}, open(d / "status.json", "w"))
-    _proc = subprocess.Popen([sys.executable, str(HERE / "trainer.py"), str(d), "--card", card, "--target", str(target), "--min-n", str(min_n)],
+    _proc = subprocess.Popen([sys.executable, str(HERE / "trainer.py"), str(d), "--card", card, "--target", str(target), "--min-n", str(min_n), "--pretrained", start],
                              stdout=open(d / "log.txt", "w"), stderr=subprocess.STDOUT, cwd=str(HERE))
     return {"run": d.name, "card": card}
 
@@ -323,6 +326,7 @@ class H(BaseHTTPRequestHandler):
             except ValueError as e: return self._err(400, str(e))
         if p == "/api/cards": return self._send(200, cards.list_cards())
         if p == "/api/jobs": return self._send(200, labruns.jobs())
+        if p == "/api/pretrained": return self._send(200, pretrained.list_all())
         if p == "/api/scans": return self._send(200, scans.summaries())
         if p == "/api/labelstudio": return self._send(200, labelstudio.status(parse_qs(urlparse(self.path).query).get("card", [None])[0]))
         m = re.fullmatch(r"/api/card/([\w-]{1,40})/writers", p)
@@ -423,7 +427,7 @@ class H(BaseHTTPRequestHandler):
             m = re.fullmatch(r"/api/card/([\w-]{1,40})/datasize/curve", self.path)
             if m:
                 if not cards.exists(m[1]): raise KeyError("no such card")
-                return self._send(200, start_curve(m[1], json.loads(body or b"{}").get("target", 85.0)))
+                b = json.loads(body or b"{}"); return self._send(200, start_curve(m[1], b.get("target", 85.0), str(b.get("pretrained", "auto"))))
             m = re.fullmatch(r"/api/card/([\w-]{1,40})/suggest", self.path)
             if m: return self._send(200, suggest.make(m[1]))
             m = re.fullmatch(r"/api/card/([\w-]{1,40})/writers", self.path)

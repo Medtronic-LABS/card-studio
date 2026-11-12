@@ -6,6 +6,8 @@ studio/uploads/
 studio/templates/
 studio/cards/
 studio/curves/
+studio/pretrained/
+studio/capacity/
 studio/.venv-labelstudio/
 studio/.venv-tflite/
 studio/labelstudio.json
