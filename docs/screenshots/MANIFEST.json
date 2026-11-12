@@ -1,26 +1,26 @@
 {
- "captured": "2026-11-11",
+ "captured": "2026-11-12",
  "mode": "?shots=1 (no patient images are built)",
  "screenshots": [
   {
    "file": "docs/screenshots/dashboard.png",
    "view": "dashboard",
    "caption": "Dashboard: model registry, getting started, activity, needs attention, field readiness",
-   "sha256": "5b90fd1d5bdd2e60613745776e93e2b1a3b029f89740fc0c8e0053cf6a8a6080",
+   "sha256": "ff74dd475db76fdedeba4627ae251ce70476fd0e2ed1c557099075c3115f3512",
    "images_on_page": 0
   },
   {
    "file": "docs/screenshots/model-quality.png",
    "view": "model-quality",
    "caption": "Model quality: per-field errors, calibration, risk-coverage, confusions, flag-policy tuner, provenance",
-   "sha256": "012d177e5307bfeb705d2891709b090cda1de86e88e14409457ea2282d28210b",
+   "sha256": "c953816f5cd61e248f1f30a4e9538d0c48efa5506f10acf64f26c812912ab3ec",
    "images_on_page": 0
   },
   {
    "file": "docs/screenshots/history.png",
    "view": "history",
    "caption": "History: training runs, paired comparison, experiment records",
-   "sha256": "c559f169bfebb77848691c7bf4734a5b3693d4dfae42a594cf525600f30fdf6c",
+   "sha256": "fa42f44ccb4ea68ba33213d8f1aba01ea305486246721de4ff4553e06696d180",
    "images_on_page": 0
   },
   {
@@ -41,7 +41,7 @@
    "file": "docs/screenshots/label.png",
    "view": "label",
    "caption": "Label and import corrected labels",
-   "sha256": "8c2913e8f5178ab6c0faa149d3fe38101697da13d62eeb7eca5e934eef12f90d",
+   "sha256": "cade4cb4e2521c6966443c4a38a952ff57f257a6f12f82c7f811730201752301",
    "images_on_page": 0
   }
  ]

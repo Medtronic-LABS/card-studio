@@ -8,7 +8,7 @@ import cv2
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cardpack"))
 import cardpack as cp
 from detect import detect_layout, load_normalized, match_score
-import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize
+import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize, labruns
 from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
@@ -322,6 +322,7 @@ class H(BaseHTTPRequestHandler):
             except KeyError as e: return self._err(404, str(e).strip("'\""))
             except ValueError as e: return self._err(400, str(e))
         if p == "/api/cards": return self._send(200, cards.list_cards())
+        if p == "/api/jobs": return self._send(200, labruns.jobs())
         if p == "/api/scans": return self._send(200, scans.summaries())
         if p == "/api/labelstudio": return self._send(200, labelstudio.status(parse_qs(urlparse(self.path).query).get("card", [None])[0]))
         m = re.fullmatch(r"/api/card/([\w-]{1,40})/writers", p)
