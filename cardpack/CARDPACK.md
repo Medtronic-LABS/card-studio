@@ -67,6 +67,8 @@ A cell is flagged for a person when its confidence is below the field's `min_con
 
 The confidence of a grammar read is `min(1, exp(margin))`, where margin is the log-likelihood of the winning string minus the log-probability of the single best unconstrained path. A string's likelihood sums over every way the steps can spell it, so the margin can exceed 0 (confidence 1); a small confidence means the grammar had to overrule the reader. The exact computation is `cardpack/grammar.py` (numpy only), with a Dart port in `cardpack/reference/grammar_decode.dart`; a port is correct when it reproduces `cardpack/reference/grammar_vectors.json` (same text, margin within 1e-6). A value outside the grammar can never be read right, so a pack only says `grammar` for a field when held-out cross-validation showed it at least as accurate as greedy (`status_reason` records both counts). Packs without `decode` behave as before; the phone app reads both, and splits `stacked`/`diagonal` cells into two pieces.
 
+One more kind exists in the Python reference only: `daymonth`, the top line of a date written on two lines (day, `/` or `.`, month, only days that month has). Studio's Clean-up lab uses it for the top piece of a `stacked` date field whose pack says `decode: grammar`; the year piece is read greedily and the two lines together must name a real calendar day (`grammar.date_ok`). It has no vectors and no Dart port yet, so a phone reads such a field greedily as before.
+
 ## Photo normalization (`preprocess.normalize`, optional)
 
 The reader takes raw gray levels, so a washed-out, shadowed or colour-cast phone photo can throw it off. A pack may say how the app should clean a photo up before cutting cells:

@@ -606,7 +606,8 @@ async function labRun(f){if(!f)return;const o=$('lres');o.innerHTML='<div class=
 function labShow(r){const ok=r.methods.filter(m=>m.available),name=m=>m.label;
  const cards=r.methods.map(m=>m.available?`<div class="card" style="margin:0"><a href="${m.image}" target="_blank" rel="noopener"><img src="${m.image}" alt="${esc(m.label)}" style="width:100%;border:1px solid var(--line);border-radius:6px"></a>
    <div style="margin-top:8px"><b>${esc(m.label)}</b> ${m.is_pack_default?'<span class="badge bg-blue-lt">pack default</span>':''}</div>
-   <div class="tag">${m.read} cells read of ${m.with_ink} with ink · <span class="${m.flagged?'warn':''}">${m.flagged} flagged</span> · mean confidence ${m.mean_confidence??'-'}</div></div>`
+   <div class="tag">${m.read} cells read of ${m.with_ink} with ink · <span class="${m.flagged?'warn':''}">${m.flagged} flagged</span> · mean confidence ${m.mean_confidence??'-'}</div>
+   ${(m.checks||[]).length?`<div class="tag warn" style="margin-top:6px"><b>Card checks (${m.checks.length})</b><ul style="padding-left:16px;margin:4px 0 0">${m.checks.slice(0,8).map(c=>`<li>${esc(c.field)} visit ${c.visit}: ${esc(c.note)}${c.suggestion?` (suggested ${esc(c.suggestion)})`:''}</li>`).join('')}</ul></div>`:''}</div>`
    :`<div class="card" style="margin:0"><b>${esc(m.label)}</b><div class="tag" style="margin-top:6px">Not available: ${esc(m.note)}</div></div>`).join('');
  const rows=r.disagreements.slice(0,80).map(d=>`<tr><td>${esc(d.field)}</td><td>${d.visit}</td>`+ok.map(m=>{const x=d.reads[m.method];return `<td class="${x.flagged?'warn':''}">${x.text?esc(x.text):'<span class="tag">(blank)</span>'}<div class="tag">${x.confidence}</div></td>`}).join('')+'</tr>').join('');
  $('lres').innerHTML=`<div class="card"><h2>${esc(r.pack)} · ${r.inliers} inliers · photo covers ${r.covered_percent}% of the card</h2>

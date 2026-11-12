@@ -11,6 +11,7 @@ import cv2, numpy as np
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "cardpack"))
 import cardpack as cp
+import cardlogic, cards, grammar
 import normalize as N
 from idtest import _sift, _homography
 
@@ -139,12 +140,20 @@ def cut_cells(card, pack, method):
             yield ri, c, field, (N.stretch_cell(crop) if method in ("cell_stretch", "flatten_cell_stretch") else crop)
 
 
-def read_cell(pack, px, field):
-    """Masked greedy CTC like AncReader.read. Returns (text, confidence)."""
+UNREAL_DATE_CONFIDENCE = 0.1
+
+
+def read_cell(pack, px, field, piece_grammar=None, piece=False):
+    """Masked greedy CTC like AncReader.read. Returns (text, confidence). piece_grammar: read this piece against a grammar kind instead of the field's
+    own (the top line of a two-line date is a "daymonth"), and falls back to greedy when nothing fits. piece: this is one line of a two-line cell, so the field's
+    whole-cell grammar (a complete date or pressure) does not apply to it."""
     x = ((px.astype(np.float32) / 255.0 - 0.5) / 0.5).reshape(1, 1, 48, 192)
     lg = pack.session.run([pack.out_name], {pack.in_name: x})[0].reshape(-1, len(pack.classes))
     spec = pack.spec[field]
-    if spec.get("decode") == "grammar":          # the field's own grammar instead of the best class at every step (constrained.py, CARDPACK.md)
+    if piece_grammar:
+        idx = sorted(spec["allowed_idx"]); text, margin = grammar.decode(lg[:, idx], [pack.classes[i] for i in idx], idx.index(pack.blank), piece_grammar)
+        if text: return text, float(min(1.0, math.exp(margin)))
+    if spec.get("decode") == "grammar" and not piece:          # the field's own grammar instead of the best class at every step (constrained.py, CARDPACK.md)
         try:
             import constrained
             text, margin = constrained.decode(lg, spec["allowed_idx"], spec["kind"], spec.get("range"), (spec.get("date") or {}).get("years"))
@@ -170,8 +179,25 @@ def read_two_line(pack, crop, field, layout):
     for piece in pieces:
         px = prepare(piece, pack)
         if px is None: return "", 0.0
-        reads.append(read_cell(pack, px, field))
-    return subcells.join(layout, reads[0][0], reads[1][0]), min(reads[0][1], reads[1][1])
+        reads.append(read_cell(pack, px, field, "daymonth" if layout == "stacked" and not reads and pack.spec[field].get("decode") == "grammar" else None, piece=True))
+    text, conf = subcells.join(layout, reads[0][0], reads[1][0]), min(reads[0][1], reads[1][1])
+    if text and layout == "stacked" and pack.spec[field].get("kind") == "date" and not grammar.date_ok(reads[0][0], reads[1][0]):
+        conf = min(conf, UNREAL_DATE_CONFIDENCE)         # the two lines do not name a real day (a 29 February without a leap year, a year line that is not a year): a person should look
+    return text, conf
+
+
+def card_checks(pack, reads):
+    """The card-level checks the card asks for (cards.checks, cardlogic.py) over one method's reads. A cell the pack flags for low confidence does not vote.
+    -> [{field, visit, rule, suggestion, note}]; [] for a card with no checks or no card folder (a pack Studio did not make)."""
+    try: asked = cards.checks(pack.id)
+    except (KeyError, ValueError, OSError): return []
+    if not asked: return []
+    g = pack.grid; by_col = g.get("axis") == "columns"; texts, weak = {}, set()
+    for (ri, c), (text, conf, flagged) in reads.items():
+        key = ((g["cols"][c] if by_col else g["rows"][ri]), (ri if by_col else c) + 1)
+        if text: texts[key] = text
+        if flagged: weak.add(key)
+    return cardlogic.check(texts, asked, weak)
 
 
 def run_method(pack, warped, covered, method):
@@ -218,7 +244,7 @@ def analyze(photo, out_dir, pack=None, packs=None, methods=N.METHODS, preview_wi
         s = preview_width / page.shape[1]
         cv2.imwrite(str(out_dir / f"{uid}_{method}.png"), cv2.resize(page, None, fx=s, fy=s, interpolation=cv2.INTER_AREA))
         all_reads[method] = reads
-        results.append({"method": method, "label": N.LABELS[method], "available": True, "image": f"/api/cleanup/{uid}/{method}.png", "is_pack_default": method == pack.default, **stats})
+        results.append({"method": method, "label": N.LABELS[method], "available": True, "image": f"/api/cleanup/{uid}/{method}.png", "is_pack_default": method == pack.default, "checks": card_checks(pack, reads), **stats})
     done = [r["method"] for r in results if r["available"]]
     diff = []
     for ri in range(len(rows)):

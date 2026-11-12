@@ -22,6 +22,7 @@ import math
 
 import numpy as np
 
+DAYS_IN_MONTH = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)      # February at 29: the year is read on another line, so a leap day is checked later by date_ok
 YEARS = (20, 27)          # the default two-digit years a date may carry (a pack field's date.years overrides)
 _cache = {}
 
@@ -33,6 +34,11 @@ def candidates(kind, rng=None, years=None):
     if kind == "date":
         days = [str(d) for d in range(1, 32)] + [f"{d:02d}" for d in range(1, 10)]; mons = [str(m) for m in range(1, 13)] + [f"{m:02d}" for m in range(1, 10)]
         out = [f"{d}{s}{m}{s}{y}" for d in days for m in mons for y in range(years[0], years[1] + 1) for s in "/."]
+    elif kind == "daymonth":       # the top line of a date written on two lines (day.month over the year): only days that month has
+        out = []
+        for m, nd in enumerate(DAYS_IN_MONTH, 1):
+            for d in range(1, nd + 1):
+                out += [f"{dd}{sep}{mm}" for dd in {str(d), f"{d:02d}"} for mm in {str(m), f"{m:02d}"} for sep in "/."]
     elif kind == "bp":
         out = [f"{s}/{d}" for s in range(70, 221) for d in range(40, 131)]
     elif kind == "number":
@@ -82,3 +88,14 @@ def decode(logits, chars, blank, kind, rng=None, years=None):
     logp = log_softmax(logits); sc = scores(logp, chars, blank, candidates(kind, rng, years))
     if not sc: return "", float("-inf")
     best = max(sc, key=sc.get); return best, float(sc[best] - logp.max(1).sum())
+
+
+def date_ok(top, year):
+    """True when `top` ("22.2" or "22/02") and `year` ("26" or "2026") together name a real calendar day. A two-digit year is 20xx. Catches what each line
+    passes alone: a 29 February in a year that has none, or a year line that did not read as a year."""
+    import datetime, re
+    m = re.fullmatch(r"(\d{1,2})[./-](\d{1,2})", (top or "").strip()); y = (year or "").strip()
+    if not m or not re.fullmatch(r"\d{2}|\d{4}", y): return False
+    try: datetime.date(int(y) + (2000 if len(y) == 2 else 0), int(m[2]), int(m[1]))
+    except ValueError: return False
+    return True

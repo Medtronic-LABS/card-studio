@@ -120,6 +120,24 @@ def fields(card):
     return out
 
 
+def checks(card):
+    """The card-level checks a card asks for (cardlogic.py): {"same_day": [fields], "increasing": [fields]}, from "checks" in the card's fields.json; {} when
+    it asks for none. Studio-side only: a card pack has no place for them. Every field named must be in the card's grid."""
+    fp = CARDS / card / "fields.json"
+    if card == LEGACY or not fp.exists(): return {}
+    raw = json.loads(fp.read_text()).get("checks") or {}
+    unknown = sorted(set(raw) - {"same_day", "increasing"})
+    if unknown: raise ValueError(f"fields.json checks: unknown rule {', '.join(unknown)} (same_day, increasing)")
+    import cardlogic
+    keys = {f["key"] for f in fields(card)}; out = {}
+    for rule, names in raw.items():
+        names = cardlogic.parse_fields(names); bad = sorted(set(names) - keys)
+        if bad: raise ValueError(f"fields.json checks.{rule} names fields that are not in the grid: {', '.join(bad)}")
+        if rule == "same_day" and len(names) < 2: raise ValueError("fields.json checks.same_day needs at least two fields")
+        out[rule] = names
+    return out
+
+
 def masks(card):
     """{field key: allowed class indices}: what the trainer and the decoder restrict each field to."""
     m = meta()
