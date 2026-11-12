@@ -9,7 +9,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "work_phaseA")); sys.path.insert(0, str(ROOT / "cardpack")); sys.path.insert(0, str(HERE))
-import cards, provenance, subcells
+import cards, constrained, provenance, subcells
 CFG = "light_lr3e-4"          # chosen on val in Phase A (selection.json)
 SEED = 20261103
 
@@ -42,8 +42,16 @@ def make_folds(rows, k=5, tries=4000, units=None):
     return [sorted(p for p in pages if units[p] in set(g)) for g in best[1]]
 
 
+def grammar_spec(card):
+    """{field: {kind, range, years}} for the fields whose output can also be read against a grammar (constrained.py): dates, blood pressures, ranged
+    numbers, one line each. Taken from the pack this run starts from."""
+    fld = json.loads(cards.base_members(card)["fields.json"])["fields"]
+    return {f["key"]: {"kind": f["kind"], "range": f["range"], "years": (f.get("date") or {}).get("years")} for f in fld
+            if f.get("layout", "single") == "single" and (f["kind"] in ("date", "bp") or (f["kind"] == "number" and f["range"]))}
+
+
 def cv_job(a):
-    fold, folds, merged, card, max_epochs = a
+    fold, folds, merged, card, max_epochs, gspec = a
     import torch; import common as C, train as T
     torch.set_num_threads(2); C.use_fields(cards.masks(card))
     rows = C.read_labels(merged); pre = torch.load(ROOT / "work_phaseA" / "pretrained.pt")
@@ -53,6 +61,13 @@ def cv_job(a):
     assert not ({r["page"] for r in tr + va} & test_pages)
     m, info = T.finetune(pre, tr, va, T.CONFIGS[CFG], seed=0, max_epochs=max_epochs, log=lambda *_: None)
     out = [dict(page=r["page"], row=r["row"], col=r["col"], label=r["label"], pred=p, conf=c) for (p, c), r in zip(T.predict_torch(m, te), te)]
+    gi = [i for i, r in enumerate(te) if r["row"] in gspec]          # the same cells read again against the field's grammar, from the same model
+    if gi:
+        import numpy as np, constrained
+        m.eval(); masks = cards.masks(card)
+        with torch.no_grad(): lg = m(torch.from_numpy(np.stack([C.to_input(C.cell_image(te[i])) for i in gi])).unsqueeze(1)).numpy()
+        for j, i in enumerate(gi):
+            g = gspec[te[i]["row"]]; out[i]["pred_grammar"], out[i]["margin"] = constrained.decode(lg[:, j, :], masks[te[i]["row"]], g["kind"], g["range"], g["years"])
     return fold, out, info["best_epoch"], info.get("hist", [])
 
 
@@ -111,9 +126,9 @@ def main():
         split_bytes = json.dumps({"seed": SEED, "unit": unit, "folds": folds}, sort_keys=True).encode()
         (run / "folds.json").write_bytes(split_bytes)
         status("cv", f"{len(rows)} labeled cells, {len(pages)} pages; 0 of 5 folds done", cv_done=0)
-        preds, bests, curves = [], [], []
+        preds, bests, curves = [], [], []; gspec = grammar_spec(a.card)
         with Pool(5) as pool:
-            for fold, out, best, hist in pool.imap_unordered(cv_job, [(f, folds, str(merged), a.card, a.max_epochs) for f in range(5)]):
+            for fold, out, best, hist in pool.imap_unordered(cv_job, [(f, folds, str(merged), a.card, a.max_epochs, gspec) for f in range(5)]):
                 preds += out; bests.append(best); curves.append({"fold": fold, "best_epoch": best, "history": hist})
                 status("cv", f"{len(bests)} of 5 folds done", cv_done=len(bests))
         assert len(preds) == n_train and len({(p["page"], p["row"], p["col"]) for p in preds}) == n_train
@@ -149,13 +164,19 @@ def main():
         # ---- gate + pack
         import cardpack as cp
         mem = cards.base_members(a.card); man = json.loads(mem["manifest.json"]); fld = json.loads(mem["fields.json"])
-        gate = {}
+        gate = {}; dec = {}; cv_g = metrics([dict(p, pred=p["pred_grammar"]) for p in preds if "pred_grammar" in p])
         for f in fld["fields"]:
-            m = cv.get(f["key"]); lo_pct = m["lo"] * 100 if m else None
+            m = cv.get(f["key"]); g = cv_g.get(f["key"])
+            if m and g and g["n"] >= 10 and g["k"] >= m["k"]:       # grammar decoding only where held-out cells show it at least as good as greedy
+                f["decode"] = "grammar"; dec[f["key"]] = dict(decode="grammar", greedy_k=m["k"], grammar_k=g["k"]); m = cv[f["key"]] = g
+                if f["kind"] == "date": f.setdefault("date", {"years": list(constrained.YEARS)})
+            elif m and g: dec[f["key"]] = dict(decode="greedy", greedy_k=m["k"], grammar_k=g["k"]); f.pop("decode", None)
+            lo_pct = m["lo"] * 100 if m else None
             if m is None: st, why = "needs-review", "no labeled cells for this field"
             elif m["n"] < a.min_n: st, why = "needs-review", f"only {m['n']} held-out cells (need {a.min_n})"
             elif lo_pct < a.target: st, why = "needs-review", f"held-out lower bound {lo_pct:.0f}% is under the {a.target:.0f}% target ({m['k']}/{m['n']})"
             else: st, why = "ship", f"held-out {m['k']}/{m['n']}, lower bound {lo_pct:.0f}% meets the {a.target:.0f}% target"
+            if f["key"] in dec: why += f" · read with {'the field grammar' if dec[f['key']]['decode'] == 'grammar' else 'greedy decoding'}: held-out {dec[f['key']]['grammar_k']} right with the grammar, {dec[f['key']]['greedy_k']} greedy"
             f["status"], f["status_reason"] = st, why; gate[f["key"]] = (st, why)
         man["version"] = man["version"] + 1; man["created"] = time.strftime("%Y-%m-%d")
         # photo normalization: gray-level reference from the scans the reader was just trained on. contrast_match was the best
@@ -178,9 +199,10 @@ def main():
         out_pack = cards.PACKS / f"{man['id']}_v{man['version']}.cardpack"; out_pack.parent.mkdir(parents=True, exist_ok=True); cp.build(mem, out_pack)
         errs = cp.validate(out_pack)
         crops_note = "stored gray crops (work/crops) or imported crops" if a.card == cards.LEGACY else f"stored gray crops (studio/cards/{a.card}/crops) or imported crops"
-        res = dict(card=a.card, split_unit=unit, split_units=n_units, dropped_labels=dropped, config=CFG, target=a.target, min_n=a.min_n, n_cells=len(rows), n_pages=len(pages), folds=[len(f) for f in folds], best_epochs=sorted(bests),
+        overall_greedy = overall; overall = metrics([dict(p, row="ALL", pred=p["pred_grammar"] if dec.get(p["row"], {}).get("decode") == "grammar" else p["pred"]) for p in preds])["ALL"]
+        res = dict(card=a.card, cv_all_greedy=overall_greedy, decode=dec, split_unit=unit, split_units=n_units, dropped_labels=dropped, config=CFG, target=a.target, min_n=a.min_n, n_cells=len(rows), n_pages=len(pages), folds=[len(f) for f in folds], best_epochs=sorted(bests),
                    final_epochs=epochs, cv_all=overall, parity=parity, tflite=tfl, minutes=round((time.time() - t0) / 60, 1),
-                   fields=[dict(field=k, **v, status=gate.get(k, ("needs-review", ""))[0], reason=gate.get(k, ("", ""))[1]) for k, v in sorted(cv.items(), key=lambda kv: -kv[1]["n"])],
+                   fields=[dict(field=k, **v, decode=dec.get(k, {}).get("decode", "greedy"), status=gate.get(k, ("needs-review", ""))[0], reason=gate.get(k, ("", ""))[1]) for k, v in sorted(cv.items(), key=lambda kv: -kv[1]["n"])],
                    unlabeled_fields=[f["key"] for f in fld["fields"] if f["key"] not in cv],
                    pack=dict(path=str(out_pack), id=man["id"], version=man["version"], validation_errors=errs, shipped=[k for k, v in gate.items() if v[0] == "ship"]),
                    provenance=provenance.collect(merged, rows, SEED, CFG, hashlib.sha256(split_bytes).hexdigest(), crops_note + ", no line removal; page normalization not applied at training time"))

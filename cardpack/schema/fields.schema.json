@@ -144,6 +144,33 @@
               "diagonal"
             ],
             "description": "single (default): one line of writing. stacked: a date written as day.month over a bar over the year. diagonal: a blood pressure written either side of a printed diagonal. The reader reads the two pieces separately and joins them"
+          },
+          "decode": {
+            "enum": [
+              "greedy",
+              "grammar"
+            ],
+            "description": "how this field's reader output is turned into text. greedy (default): best class at every step, then CTC collapse. grammar: the string the field can hold that the reader's output supports best (see CARDPACK.md); only for date, bp and ranged number fields"
+          },
+          "date": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "years"
+            ],
+            "properties": {
+              "years": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 99
+                },
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "first and last two-digit year a date may carry under decode grammar"
+              }
+            }
           }
         }
       }

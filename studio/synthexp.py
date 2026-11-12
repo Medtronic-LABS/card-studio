@@ -15,6 +15,7 @@ all of the card's scans, including the pages a fold tests on; that blank card co
 
     python synthexp.py run [--quick] [--images 30000] [--epochs 4]       results in studio/capacity/v2/
     python synthexp.py report
+    python synthexp.py pretrain --out WEIGHTS.pt [--images 30000] [--epochs 4]    only the pretraining, with the generator as it is now (for constrained.py)
 """
 import argparse, json, random, sys, time, traceback
 from multiprocessing import Pool
@@ -109,6 +110,9 @@ def show(doc):
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(); ap.add_argument("cmd", choices=["run", "report"]); ap.add_argument("--quick", action="store_true"); ap.add_argument("--images", type=int, default=30000); ap.add_argument("--epochs", type=int, default=4); a = ap.parse_args()
-    if a.cmd == "run": show(run(300 if a.quick else a.images, 1 if a.quick else a.epochs, a.quick))
+    ap = argparse.ArgumentParser(); ap.add_argument("cmd", choices=["run", "report", "pretrain"]); ap.add_argument("--quick", action="store_true"); ap.add_argument("--images", type=int, default=30000); ap.add_argument("--epochs", type=int, default=4); ap.add_argument("--out"); a = ap.parse_args()
+    if a.cmd == "pretrain":
+        if not a.out: sys.exit("--out WEIGHTS.pt is required")
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True); pretrain(a.out, a.images, a.epochs, log=lambda m: print(m, flush=True))
+    elif a.cmd == "run": show(run(300 if a.quick else a.images, 1 if a.quick else a.epochs, a.quick))
     else: show(json.loads((OUT / ("quick" if a.quick else "full") / "summary.json").read_text()))

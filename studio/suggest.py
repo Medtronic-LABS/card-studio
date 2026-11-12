@@ -82,6 +82,12 @@ def make(card):
         lg = pk.session.run([pk.out_name], {pk.in_name: np.stack([x for _, x in chunk])[:, None]})[0]        # [T, B, classes]
         for j, (k, _) in enumerate(chunk):
             text, conf = _decode(lg[:, j], masks[k[1]], pk.classes, pk.blank)
+            spec = pk.spec.get(k[1], {})
+            if spec.get("decode") == "grammar":
+                try:
+                    import constrained, math
+                    text, margin = constrained.decode(lg[:, j], masks[k[1]], spec["kind"], spec.get("range"), (spec.get("date") or {}).get("years")); conf = min(1.0, math.exp(margin))
+                except ImportError: pass
             rows.append({"page": k[0], "row": k[1], "col": k[2], "text": text, "confidence": round(conf, 4), "source": pk.name})
     d = cards.CARDS / card; tmp = d / "suggestions.csv.tmp"
     with open(tmp, "w", newline="") as fh:

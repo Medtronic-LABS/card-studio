@@ -55,6 +55,18 @@ Field keys must equal the grid's field names (`rows`, or `cols` for `ruled-rows-
 
 A cell is flagged for a person when its confidence is below the field's `min_confidence`, or when the read breaks the field's rules. Blank cells are never flagged.
 
+## Decoding: greedy or grammar
+
+`decode` on a field says how the reader's output becomes text. Absent or `greedy`: best allowed class at every step, then CTC collapse (`ctc-greedy-masked`), confidence the lowest character probability. `grammar`: the reader's masked per-step log-probabilities are scored against every string the field can hold, by the CTC log-likelihood of that exact string (the sum over all alignments, the quantity training maximizes), and the best string is the read.
+
+| kind | strings tried |
+|---|---|
+| `date` | day 1-31 and month 1-12, each with or without a leading zero, a two-digit year from `date.years[0]` to `date.years[1]` (default 20 to 27), `/` or `.` between the parts |
+| `bp` | systolic `bp.sys` low to high over diastolic `bp.dia` low to high, `/` between |
+| `number` | every whole number from `range[0]` to `range[1]`, and every one-decimal value in that range |
+
+The confidence of a grammar read is `min(1, exp(margin))`, where margin is the log-likelihood of the winning string minus the log-probability of the single best unconstrained path; 1 means the grammar agreed with greedy, a small value means the grammar had to overrule the reader. A value outside the grammar can never be read right, so a pack only says `grammar` for a field when held-out cross-validation showed it at least as accurate as greedy (`status_reason` records both counts). Packs without `decode` behave as before; the phone app reads `greedy` only so far.
+
 ## Photo normalization (`preprocess.normalize`, optional)
 
 The reader takes raw gray levels, so a washed-out, shadowed or colour-cast phone photo can throw it off. A pack may say how the app should clean a photo up before cutting cells:

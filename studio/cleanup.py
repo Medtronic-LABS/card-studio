@@ -143,7 +143,14 @@ def read_cell(pack, px, field):
     """Masked greedy CTC like AncReader.read. Returns (text, confidence)."""
     x = ((px.astype(np.float32) / 255.0 - 0.5) / 0.5).reshape(1, 1, 48, 192)
     lg = pack.session.run([pack.out_name], {pack.in_name: x})[0].reshape(-1, len(pack.classes))
-    ok = np.zeros(len(pack.classes), bool); ok[pack.spec[field]["allowed_idx"]] = True
+    spec = pack.spec[field]
+    if spec.get("decode") == "grammar":          # the field's own grammar instead of the best class at every step (constrained.py, CARDPACK.md)
+        try:
+            import constrained
+            text, margin = constrained.decode(lg, spec["allowed_idx"], spec["kind"], spec.get("range"), (spec.get("date") or {}).get("years"))
+            return text, float(min(1.0, math.exp(margin)))
+        except ImportError: pass                 # grammar scoring needs torch; without it this field is read greedily
+    ok = np.zeros(len(pack.classes), bool); ok[spec["allowed_idx"]] = True
     z = np.where(ok[None, :], lg, -np.inf); best = z.argmax(1)
     out, confs, prev = [], [], -1
     for t, b in enumerate(best):

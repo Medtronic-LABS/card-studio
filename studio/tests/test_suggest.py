@@ -14,7 +14,7 @@ class FakeReader:
     """Answers "57" for every cell, less sure on each later cell, so order and thresholds can be checked."""
     def __init__(self, name):
         m = cards.meta(); self.classes, self.blank = m["classes"], m["blank_idx"]; self.name = name
-        self.man = {"reader": {"input": {"height": 48, "width": 192}}}; self.in_name, self.out_name = "image", "logits"; self.session = self; self.n = 0
+        self.man = {"reader": {"input": {"height": 48, "width": 192}}}; self.in_name, self.out_name = "image", "logits"; self.session = self; self.n = 0; self.spec = {}          # a pack's per-field rules; none means greedy reads
 
     def run(self, _, feed):
         x = feed["image"]; T, V = 8, len(self.classes); out = np.full((T, x.shape[0], V), -20.0, np.float32); out[:, :, self.blank] = 0.0

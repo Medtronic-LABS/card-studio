@@ -25,7 +25,8 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 NUMTA = ROOT / "data" / "bangla_digits"
 KINDS = ("number", "date", "bp")
-SEPARATORS = "/."
+SEPARATORS = "/.|"          # how a date's parts are divided on the page: a slash, a dot, or (very common on the ANC card) a tall vertical bar; a bar is labeled "/"
+DATE_STYLE = (("|", 0.4), ("/", 0.3), (".", 0.3))
 GLYPH = 32
 
 
@@ -54,9 +55,9 @@ def value(kind, rng):
         s = str(d(1, 199)) if rng.random() < 0.7 else f"{d(1, 99)}.{d(0, 9)}"
         return s, (s,)
     if kind == "date":
-        sep = rng.choice(SEPARATORS); dd, mm = d(1, 31), d(1, 12); pad = rng.random() < 0.4
-        day, mon = (f"{dd:02d}", f"{mm:02d}") if pad else (str(dd), str(mm)); yr = str(d(20, 27))
-        return f"{day}{sep}{mon}{sep}{yr}", (f"{day}{sep}{mon}", yr)
+        sep = rng.choices([s for s, _ in DATE_STYLE], [w for _, w in DATE_STYLE])[0]; dd, mm = d(1, 31), d(1, 12); pad = rng.random() < 0.4
+        day, mon = (f"{dd:02d}", f"{mm:02d}") if pad else (str(dd), str(mm)); yr = str(d(20, 27)); lab = "/" if sep == "|" else sep
+        return f"{day}{lab}{mon}{lab}{yr}", (f"{day}{sep}{mon}", yr)          # the parts are drawn with the written separator, the label has the plain one
     if kind == "bp":
         sy, di = d(90, 220), d(50, 130); return f"{sy}/{di}", (str(sy), str(di))
     raise ValueError(kind)
@@ -68,6 +69,7 @@ def _symbol(ch, size):
     if ch == ".": cv2.circle(g, (size // 2, int(size * .86)), max(2, size // 9), 0, -1)
     elif ch == "/": cv2.line(g, (int(size * .15), size - 1), (int(size * .85), 0), 0, max(2, size // 12))
     elif ch == "-": cv2.line(g, (int(size * .1), size // 2), (int(size * .9), size // 2), 0, max(2, size // 10))
+    elif ch == "|": cv2.line(g, (size // 2, 0), (size // 2, size - 1), 0, max(2, size // 11))
     return g
 
 
@@ -78,6 +80,7 @@ def string_image(text, pool, rng, height):
         if ch.isdigit():
             g = pool.by_digit[int(ch)][rng.randrange(len(pool.by_digit[int(ch)]))]; h = max(8, int(height * rng.uniform(.85, 1.15)))
             gl.append(cv2.resize(g, (max(3, int(round(g.shape[1] * h / g.shape[0]))), h), interpolation=cv2.INTER_AREA))
+        elif ch == "|": gl.append(_symbol("|", max(12, int(height * 1.0 * rng.uniform(.85, 1.15)))))          # a tall bar the height of the digits, as written
         else: gl.append(_symbol(ch, max(10, int(height * .6))))
     gap = max(2, height // 8); hm = max(g.shape[0] for g in gl); row = None
     for g in gl:
@@ -110,11 +113,18 @@ def _fit(ink, max_w, max_h):
     s = min(1.0, max_w / ink.shape[1], max_h / ink.shape[0]); return ink if s >= 1 else cv2.resize(ink, None, fx=s, fy=s, interpolation=cv2.INTER_AREA)
 
 
+def _single_text(kind, parts):
+    """What is written when the whole value is on one line: a date's parts joined with the separator its first part was written with."""
+    if len(parts) == 1: return parts[0]
+    if kind == "date": sep = next(c for c in parts[0] if not c.isdigit()); return parts[0] + sep + parts[1]
+    return parts[0] + "/" + parts[1]
+
+
 def draw(bg, kind, layout, parts, pool, rng):
     """Handwriting for one cell drawn onto a copy of the background. -> uint8 image the size of `bg`."""
     cell = bg.copy(); h, w = cell.shape
     if layout == "single":
-        ink = _stroke(_shear_turn(string_image(parts[0] if len(parts) == 1 else "/".join(parts), pool, rng, int(h * rng.uniform(.38, .62))), rng), rng)
+        ink = _stroke(_shear_turn(string_image(_single_text(kind, parts), pool, rng, int(h * rng.uniform(.38, .62))), rng), rng)
         ink = _fit(ink, w * rng.uniform(.6, .86), h * .85); lay(cell, ink, w * rng.uniform(.42, .6), h * rng.uniform(.42, .58))
     elif layout == "stacked":
         hl = int(h * rng.uniform(.22, .34)); top = _fit(_stroke(_shear_turn(string_image(parts[0], pool, rng, hl), rng, .3, 5), rng), w * .82, h * .42)

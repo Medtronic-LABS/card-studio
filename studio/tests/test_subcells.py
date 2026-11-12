@@ -153,7 +153,7 @@ class Synthetic(unittest.TestCase):
     def test_values_follow_the_grammars(self):
         rng = random.Random(1)
         for _ in range(200):
-            lab, parts = self.G.value("date", rng); self.assertIsNotNone(subcells.split_label("stacked", lab)); self.assertEqual(parts[0] + lab[len(parts[0])] + parts[1], lab)
+            lab, parts = self.G.value("date", rng); self.assertIsNotNone(subcells.split_label("stacked", lab)); self.assertEqual(parts[0].replace("|", "/") + lab[len(parts[0])] + parts[1], lab)
             lab, parts = self.G.value("bp", rng); self.assertIsNotNone(subcells.split_label("diagonal", lab))
             lab, _ = self.G.value("number", rng); float(lab)
 
