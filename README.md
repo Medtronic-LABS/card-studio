@@ -8,19 +8,19 @@ Everything runs on one machine and binds to `127.0.0.1` only. There are no cloud
 
 ## Status
 
-_Aggregate numbers from the author's own labeled data, updated 2026-11-12. Held-out = pooled 5-fold cross-validation split by page._
+_Aggregate numbers from the author's own labeled data, updated 2026-11-13. Held-out = pooled 5-fold cross-validation split by page._
 
 | | |
 |---|---|
-| Card types / pack versions | 1 / 5 |
-| Saved templates | 4 |
+| Card types / pack versions | 3 / 8 |
+| Saved templates | 6 |
 | Labeled cells | 369 on 49 pages |
-| Training runs / experiment records | 2 / 4 |
-| Fields that meet the ship gate | 3 of 22 (anc v7) |
-| Held-out exact match, latest run | 73% (95% 68% to 77%), 369 cells |
-| Held-out character error rate | 28.9% |
-| Calibration error (ECE) | 11.4 points |
-| Under the app's flag rule | 78% auto-accepted at 86% accuracy; silent errors 10.6% of cells |
+| Training runs / experiment records | 5 / 4 |
+| Fields that meet the ship gate | 4 of 22 (anc v8) |
+| Held-out exact match, latest run | 31% (95% 27% to 35%), 546 cells |
+| Held-out character error rate | 15.0% |
+| Calibration error (ECE) | 38.5 points |
+| Under the app's flag rule | 52% auto-accepted at 39% accuracy; silent errors 31.7% of cells |
 
 
 ## Screenshots
