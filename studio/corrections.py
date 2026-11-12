@@ -5,6 +5,8 @@ studio/imports/crops/<field>/<col>/<page>.png, the same layout as work/crops so 
 
 1. Phone corrections: a zip (or a folder pulled off the phone) with
      corrections.jsonl    one JSON object per line: {"id", "pack_id", "pack_version", "field", "col", "label", "crop", "created"}
+                          and optionally "card" (one id per photographed card: the cells of one card share a page here) and "writer"
+                          (a code such as W07, never a name: recorded for the card's pack so cross-validation can split by writer)
      crops/<name>.png     the cell image the person looked at (crop = member name)
    `col` is the visit column as "c<N>" (c1 = first visit). `field` is the pack's field key.
 2. Label Studio JSON export: tasks whose image file is named <field>_<col>_<page>.png (as the Studio's own Label Studio
@@ -22,6 +24,7 @@ CSV_COLS = ["page", "row", "col", "label", "crop", "source", "pack", "pack_versi
 FIELD = re.compile(r"^[A-Za-z0-9_]{1,40}$")
 COL = re.compile(r"^c[1-9][0-9]?$")
 ID = re.compile(r"^[0-9A-Za-z-]{8,64}$")
+WRITER = re.compile(r"^[A-Za-z0-9_-]{1,24}$")
 CROPNAME = re.compile(r"^[A-Za-z0-9_.-]{1,80}\.png$")
 PNG = b"\x89PNG\r\n\x1a\n"
 MAX_RECORDS, MAX_CROP, MAX_LABEL = 5000, 400_000, 40
@@ -67,7 +70,7 @@ def import_phone(read_member, names, jsonl_name="corrections.jsonl"):
     if jsonl_name not in names: raise ValueError("no corrections.jsonl in the upload")
     lines = [l for l in read_member(jsonl_name).decode("utf-8").splitlines() if l.strip()]
     if len(lines) > MAX_RECORDS: raise ValueError(f"too many records (limit {MAX_RECORDS})")
-    _, cropdir = _paths(); good, bad = [], []
+    _, cropdir = _paths(); good, bad = [], []; writers = {}      # writers: {(pack_id, writer): [pages]}
     for n, line in enumerate(lines, 1):
         try:
             r = json.loads(line)
@@ -77,20 +80,36 @@ def import_phone(read_member, names, jsonl_name="corrections.jsonl"):
             if not COL.match(str(r.get("col", ""))): raise ValueError("col must be c1, c2, ...")
             if not isinstance(r.get("pack_version"), int) or not FIELD.match(str(r.get("pack_id", ""))): raise ValueError("pack_id / pack_version missing")
             label = _clean_label(r.get("label"))
+            card = r.get("card")
+            if card is not None and not ID.match(str(card)): raise ValueError("bad card id")
+            writer = str(r.get("writer") or "")
+            if writer and not WRITER.match(writer): raise ValueError("writer must be a code (letters, digits, _ or -, at most 24), not a name")
             cn = str(r.get("crop", ""))
             member = f"crops/{cn}"
             if not CROPNAME.match(cn) or member not in names: raise ValueError("crop missing or has an unsafe name")
             png = read_member(member)
             if not png.startswith(PNG) or len(png) > MAX_CROP: raise ValueError("crop is not a small PNG")
-            page = "ph-" + str(r["id"]).replace("-", "")[:12]
+            page = "ph-" + str(card if card is not None else r["id"]).replace("-", "")[:12]
             out = cropdir / r["field"] / r["col"] / f"{page}.png"
             out.parent.mkdir(parents=True, exist_ok=True); out.write_bytes(png)
             good.append({"page": page, "row": r["field"], "col": r["col"], "label": label, "crop": str(out.relative_to(IMPORTS)),
                          "source": "phone", "pack": r["pack_id"], "pack_version": r["pack_version"], "created": str(r.get("created", ""))[:32]})
+            if writer: writers.setdefault((r["pack_id"], writer), set()).add(page)
         except (ValueError, json.JSONDecodeError, UnicodeDecodeError) as e:
             bad.append({"line": n, "reason": str(e)})
     added, changed = _merge(good)
-    return {"records": len(lines), "imported": len(good), "new": added, "changed": changed, "rejected": bad}
+    noted = _record_writers(writers)
+    return {"records": len(lines), "imported": len(good), "new": added, "changed": changed, "rejected": bad, "writers_recorded": noted}
+
+
+def _record_writers(writers):
+    """Say who wrote the imported cards, for the card each pack belongs to. -> number of pages that got a writer; a pack with no card here is skipped."""
+    import cards
+    n = 0
+    for (pack_id, writer), pages in writers.items():
+        card = next((c["id"] for c in cards.list_cards() if cards.pack_id(c["id"]) == pack_id), None)
+        if card is not None: n += cards.set_writers(card, writer, sorted(pages))
+    return n
 
 
 def import_phone_zip(data: bytes):

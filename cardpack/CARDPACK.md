@@ -47,7 +47,7 @@ A grid is a ruled table: column lines at the top and bottom of the table, and ro
 | `ruled-columns-v1` | `rows` = field keys | a row | a column | ANC, EPI |
 | `ruled-rows-v1` | `axis: "columns"`, `cols` = field keys, `rows` = `r1`, `r2`, ... | a column | a row | NCD (one line per visit) |
 
-Field keys must equal the grid's field names (`rows`, or `cols` for `ruled-rows-v1`). The cell geometry is the same in both. The phone app only reads `ruled-columns-v1` so far.
+Field keys must equal the grid's field names (`rows`, or `cols` for `ruled-rows-v1`). The cell geometry is the same in both. The phone app reads both.
 
 ## Field kinds
 
@@ -65,7 +65,7 @@ A cell is flagged for a person when its confidence is below the field's `min_con
 | `bp` | systolic `bp.sys` low to high over diastolic `bp.dia` low to high, `/` between |
 | `number` | every whole number from `range[0]` to `range[1]`, and every one-decimal value in that range |
 
-The confidence of a grammar read is `min(1, exp(margin))`, where margin is the log-likelihood of the winning string minus the log-probability of the single best unconstrained path. A string's likelihood sums over every way the steps can spell it, so the margin can exceed 0 (confidence 1); a small confidence means the grammar had to overrule the reader. The exact computation is `cardpack/grammar.py` (numpy only), with a Dart port in `cardpack/reference/grammar_decode.dart`; a port is correct when it reproduces `cardpack/reference/grammar_vectors.json` (same text, margin within 1e-6). A value outside the grammar can never be read right, so a pack only says `grammar` for a field when held-out cross-validation showed it at least as accurate as greedy (`status_reason` records both counts). Packs without `decode` behave as before; the phone app reads `greedy` only so far.
+The confidence of a grammar read is `min(1, exp(margin))`, where margin is the log-likelihood of the winning string minus the log-probability of the single best unconstrained path. A string's likelihood sums over every way the steps can spell it, so the margin can exceed 0 (confidence 1); a small confidence means the grammar had to overrule the reader. The exact computation is `cardpack/grammar.py` (numpy only), with a Dart port in `cardpack/reference/grammar_decode.dart`; a port is correct when it reproduces `cardpack/reference/grammar_vectors.json` (same text, margin within 1e-6). A value outside the grammar can never be read right, so a pack only says `grammar` for a field when held-out cross-validation showed it at least as accurate as greedy (`status_reason` records both counts). Packs without `decode` behave as before; the phone app reads both, and splits `stacked`/`diagonal` cells into two pieces.
 
 ## Photo normalization (`preprocess.normalize`, optional)
 

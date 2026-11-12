@@ -99,6 +99,33 @@ class LabelStudio(Base):
         with self.assertRaises(ValueError): C.import_label_studio(b'{"not": "a list"}', crops_root=self.crops)
 
 
+class CardAndWriter(Base):
+    def setUp(self):
+        super().setUp(); import cards
+        self.old_cards = (cards.WORK, cards.CARDS); cards.WORK = Path(self.tmp.name) / "work"; cards.CARDS = Path(self.tmp.name) / "cards"
+
+    def tearDown(self):
+        import cards
+        cards.WORK, cards.CARDS = self.old_cards; super().tearDown()
+
+    def test_cells_of_one_photographed_card_share_a_page_and_the_writer_is_recorded(self):
+        import cards
+        rep = C.import_phone_zip(zip_of([rec(1, card="c0ffee0012345678", writer="W07"), rec(2, field="weight_kg", col="c1", label="57", card="c0ffee0012345678", writer="W07"),
+                                         rec(3, card="deadbeef87654321", writer="W08"), rec(4, card="feedface11223344")]))
+        self.assertEqual((rep["imported"], rep["rejected"], rep["writers_recorded"]), (4, [], 2))
+        self.assertEqual(sorted({r["page"] for r in C.read_imported()}), ["ph-c0ffee001234", "ph-deadbeef8765", "ph-feedface1122"])
+        self.assertEqual({r["page"] for r in C.read_imported() if r["row"] == "weight_kg"}, {"ph-c0ffee001234"})
+        self.assertEqual(cards.writers("anc"), {"ph-c0ffee001234": "W07", "ph-deadbeef8765": "W08"})          # the card with no writer has none
+
+    def test_a_name_instead_of_a_code_or_a_bad_card_id_rejects_that_record_only(self):
+        rep = C.import_phone_zip(zip_of([rec(1, writer="Dr Rahman"), rec(2, card="../x"), rec(3, writer="W01")]))
+        self.assertEqual((rep["imported"], [b["line"] for b in rep["rejected"]]), (1, [1, 2])); self.assertIn("not a name", rep["rejected"][0]["reason"])
+
+    def test_old_records_without_a_card_still_import_one_page_each(self):
+        rep = C.import_phone_zip(zip_of([rec(1), rec(2, field="weight_kg", col="c1", label="57")]))
+        self.assertEqual((rep["imported"], len({r["page"] for r in C.read_imported()}), rep["writers_recorded"]), (2, 2, 0))
+
+
 class MergeIntoTraining(Base):
     def test_trainer_merge_includes_imports_and_never_edits_labels_csv(self):
         sys.path.insert(0, str(HERE.parent / "work_phaseA")); sys.path.insert(0, str(HERE.parent / "cardpack"))
