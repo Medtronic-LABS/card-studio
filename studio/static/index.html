@@ -128,12 +128,20 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}.side input,.
   <div class="card" id="mlheadcard" style="display:none"><b id="mlhead"></b> <span class="tag" id="mlsub"></span></div>
   <div id="mlbody"></div>
  </div>
+ <div class="view hide" id="v-play">
+  <div class="card"><h2>Try a card with a model</h2>
+   <div class="tag">Pick a card (its template and grid align and cut your photo) and a model to read it with. A pack or run reader uses the card's field rules and grammars; an outside model reads greedily in its own characters. A model made for another card can read poorly: that is what this shows. Nothing is sent anywhere; the photo is not kept.</div>
+   <div class="row"><label>Card <select id="pgcard"></select></label><label>Model <select id="pgmodel"></select></label></div>
+   <div class="tag" id="pghelp"></div>
+   <div class="row"><button class="btn" onclick="pgpack.click()">Add a pack (.cardpack)</button><input id="pgpack" type="file" accept=".cardpack" class="hide">
+    <button class="btn" onclick="tab('train')">Add an outside model (Train tab)</button><button class="btn" onclick="tab('cards')">Add a template (Cards tab)</button></div>
+   <div class="tag">A pack is a template and a reader together, so adding one gives you both: its id shows up in the Card list and in the Model list. An id and version already installed is never overwritten.</div>
+   <div class="drop" id="pgdrop">Drop a card photo here or <button class="btn" onclick="pgfile.click()">Browse</button><input id="pgfile" type="file" accept="image/*,.pdf,.heic" class="hide"></div></div>
+  <div id="pgres"></div>
+ </div>
  <div class="view hide" id="v-lab">
   <div class="card"><h2>Try the photo clean-up options on one photo</h2>
    <div class="tag">Upload a card photo. It is aligned to a card pack, cleaned up each way the app offers, and read with the pack's reader. Nothing is sent anywhere; previews are deleted after a day. There is no ground truth for an uploaded photo, so judge the reads against the card.</div>
-   <div class="row"><label>Card <select id="pgcard"><option value="">Detect the card (installed packs)</option></select></label>
-    <label>Model <select id="lmodel"></select></label></div>
-   <div class="tag" id="lhelp">Pick a card (its template and grid align and cut your photo) and any model to read it with. A pack or run reader uses the card's field rules and grammars; an outside model reads greedily in its own characters. A model made for another card can read poorly: that is what this shows.</div>
    <div class="row"><label>Card pack <select id="lpack"><option value="auto">Best match (newest on ties)</option></select></label></div>
    <div class="drop" id="ldrop">Drop a card photo here or <button class="btn" onclick="lfile.click()">Browse</button><input id="lfile" type="file" accept="image/*,.pdf,.heic" class="hide"></div></div>
   <div id="lres"></div>
@@ -542,11 +550,11 @@ async function cvLoad(latest,running){const head=$('cvhead'),body=$('cvbody');if
   body.className='';body.innerHTML=cvDraw(c)}catch(e){body.innerHTML=`<span class="bad">${esc(e.message)}</span>`}}
 async function gateStart(){try{const s=TSET.ps?tsSettings():{};await api('/api/train/start',{method:'POST',body:JSON.stringify({card:$('gc').value,target:+$('gt').value,min_n:+$('gn').value,pretrained:$('gp')?$('gp').value:'auto',max_epochs:TSET.maxep,settings:s})});gatePoll()}catch(e){alert(e.message)}}
 
-const TABS=[['cards','Cards'],['label','Label'],['train','Train & Ship'],['history','History'],['ml','Model quality'],['lab','Clean-up lab'],['how','How to use']];
+const TABS=[['cards','Cards'],['label','Label'],['train','Train & Ship'],['play','Playground'],['history','History'],['ml','Model quality'],['lab','Clean-up lab'],['how','How to use']];
 function tab(t){clearTimeout(JTIMER);if(!TABS.some(x=>x[0]===t))t='cards';$('editor').classList.add('hide');$('pview').classList.add('hide');$('home').classList.remove('hide');
  TABS.forEach(([k])=>$('v-'+k).classList.toggle('hide',k!==t));[...$('tabs').children].forEach((b,i)=>b.classList.toggle('on',TABS[i][0]===t));$('pg-sub').textContent=TITLES[t][0];$('pg-title').textContent=TITLES[t][1];
- try{history.replaceState(null,'','#'+t)}catch(e){}if(t==='cards')refreshCards();if(t==='label'){loadLabel();loadLabeling()}if(t==='train'){extLoad();tsLoad();evLoad()}if(t==='history'){loadHistory();loadExperiments();loadJobs()};if(t==='lab')labInit();if(t==='ml')loadMLHome()}
-const ICON={cards: `<path d="M3 5h18v14H3z"/><path d="M3 10h18M8 5v14"/>`, label: `<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>`, train: `<path d="M4 19V9m6 10V5m6 14v-7m6 7H2"/>`, how: `<circle cx="12" cy="12" r="9"/><path d="M12 8v.01M11 12h1v4h1"/>`};const TITLES={cards:['Home','Dashboard'],label:['Data','Label cells'],train:['Reader','Train & ship'],history:['Runs','History & compare'],ml:['Evaluation','Model quality'],lab:['Try it','Photo clean-up lab'],how:['Guide','How to use']};
+ try{history.replaceState(null,'','#'+t)}catch(e){}if(t==='cards')refreshCards();if(t==='label'){loadLabel();loadLabeling()}if(t==='train'){extLoad();tsLoad();evLoad()}if(t==='history'){loadHistory();loadExperiments();loadJobs()};if(t==='lab')labInit();if(t==='play')pgInit();if(t==='ml')loadMLHome()}
+const ICON={cards: `<path d="M3 5h18v14H3z"/><path d="M3 10h18M8 5v14"/>`, label: `<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>`, train: `<path d="M4 19V9m6 10V5m6 14v-7m6 7H2"/>`, play: `<path d="M7 4l13 8-13 8z"/>`, how: `<circle cx="12" cy="12" r="9"/><path d="M12 8v.01M11 12h1v4h1"/>`};const TITLES={cards:['Home','Dashboard'],label:['Data','Label cells'],train:['Reader','Train & ship'],history:['Runs','History & compare'],ml:['Evaluation','Model quality'],play:['Try it','Playground'],lab:['Try it','Photo clean-up lab'],how:['Guide','How to use']};
 $('tabs').innerHTML='';TABS.forEach(([k,n])=>{const b=document.createElement('a');b.className='nav-link';b.href='#'+k;b.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg><span>${n}</span>`;b.onclick=e=>{e.preventDefault();tab(k)};$('tabs').appendChild(b)});
 let REG={sel:{}};
 function when(ts){const d=Math.floor((Date.now()/1000-ts)/86400);return d<=0?'today':d===1?'yesterday':d<30?d+' days ago':new Date(ts*1000).toISOString().slice(0,10)}
@@ -756,15 +764,32 @@ async function runDetail(n){const rs=await api('/api/runs'),r=rs.find(x=>x.name=
   <details style="margin-top:10px" ontoggle="if(this.open)runLog('${n}')"><summary>Training log</summary><div id="rlog" class="tag" style="padding-top:6px">loading…</div></details></div>`;$('rdetail').scrollIntoView({behavior:'smooth',block:'start'})}
 async function runLog(n){const o=$('rlog'),l=await api(`/api/run/${n}/log`);o.innerHTML=l.found?`${l.cut?`<div class="tag">Showing the last ${l.text.length} of ${l.bytes} bytes. <a href="/api/run/${n}/download/log.txt" download>Download all</a></div>`:`<a href="/api/run/${n}/download/log.txt" download>Download</a>`}<pre style="max-height:360px;overflow:auto;margin-top:6px;font-size:11px">${esc(l.text)}</pre>`:'This run has no log file.'}
 
+let PGBOUND=false,PGOPT=null;
+async function pgInit(){const cs=$('pgcard'),ms=$('pgmodel');
+ try{PGOPT=await api('/api/playground/options')}catch(e){$('pghelp').textContent='Could not load the card and model lists: '+e.message;return}
+ const cc=cs.value,cm=ms.value;
+ cs.innerHTML=PGOPT.cards.map(c=>`<option value="${esc(c.id)}">${esc(c.id)}${c.from_pack?' · from a pack':c.pack_versions.length?'':' · no model yet'}</option>`).join('');cs.value=[...cs.options].some(x=>x.value===cc)?cc:((PGOPT.cards[0]||{}).id||'');
+ ms.innerHTML=PGOPT.models.map(m=>`<option value="${esc(m.id)}">${esc(m.label)}</option>`).join('');
+ const pick=()=>{const c=PGOPT.cards.find(x=>x.id===cs.value)||{};const noOwn=!(c.pack_versions||[]).length;const own=[...ms.options].find(o=>o.value==='card');if(own)own.disabled=noOwn;
+  $('pghelp').textContent=noOwn?`${cs.value} has no trained pack, so pick another model to read it with.`:'';if(noOwn&&ms.value==='card'){const o=[...ms.options].find(x=>x.value!=='card');if(o)ms.value=o.value}};
+ cs.onchange=()=>{ms.value='card';pick()};ms.value=[...ms.options].some(x=>x.value===cm)?cm:'card';pick();
+ if(!PGBOUND){PGBOUND=true;const z=$('pgdrop');['dragover','dragenter'].forEach(e=>z.addEventListener(e,x=>{x.preventDefault();z.classList.add('over')}));['dragleave','drop'].forEach(e=>z.addEventListener(e,x=>{x.preventDefault();z.classList.remove('over')}));z.addEventListener('drop',e=>pgRun(e.dataTransfer.files[0]));$('pgfile').onchange=e=>{pgRun(e.target.files[0]);e.target.value=''};
+  $('pgpack').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{const r=await api('/api/pack/import',{method:'POST',body:f});await pgInit();$('pgcard').value=r.id;$('pgcard').onchange();$('pghelp').textContent=`Added ${r.file}: its template is in the Card list and its reader in the Model list.`}catch(x){$('pghelp').textContent='Could not add it: '+x.message}}}}
+async function pgRun(f){if(!f)return;const o=$('pgres');o.innerHTML='<div class="msg">Aligning and reading…</div>';
+ try{const r=await api('/api/cleanup?card='+encodeURIComponent($('pgcard').value)+'&model='+encodeURIComponent($('pgmodel').value),{method:'POST',body:f});pgShow(r)}catch(e){o.innerHTML=`<div class="msg bad">${esc(e.message)}</div>`}}
+function pgShow(r){const m=r.methods.find(x=>x.available&&x.is_pack_default)||r.methods.find(x=>x.available);
+ $('pgres').innerHTML=`<div class="card"><h2>${esc(r.pack)} · ${r.inliers} inliers · photo covers ${r.covered_percent}% of the card</h2>
+  ${m?`<a href="${m.image}" target="_blank" rel="noopener"><img src="${m.image}" alt="aligned card" style="max-width:100%;border:1px solid var(--line);border-radius:6px"></a>
+  <div class="tag">${m.read} cells read of ${m.with_ink} with ink · <span class="${m.flagged?'warn':''}">${m.flagged} flagged</span> · photo clean-up: ${esc(m.label)}. To compare the clean-up options, use the Clean-up lab.</div>
+  ${(m.checks||[]).length?`<div class="tag warn" style="margin-top:6px"><b>Card checks (${m.checks.length})</b><ul style="padding-left:16px;margin:4px 0 0">${m.checks.slice(0,8).map(c=>`<li>${esc(c.field)} visit ${c.visit}: ${esc(c.note)}${c.suggestion?` (suggested ${esc(c.suggestion)})`:''}</li>`).join('')}</ul></div>`:''}`:''}</div>
+  <div class="card"><h2>Every cell read (${(r.cells||[]).length} with ink)</h2>
+  ${(r.cells||[]).length?`<div class="tag">Amber = below the field's minimum confidence. Confidence is the posterior, the margin or the greedy minimum, as the field says.</div><table class="table table-vcenter"><tr><th>Field</th><th>Visit</th><th>Cell</th><th>Read</th><th>Confidence</th><th>Decode</th></tr>${r.cells.map(c=>`<tr class="${c.flagged?'warn':''}"><td>${esc(c.field)}</td><td>${c.visit}</td><td>${c.image?`<img src="${c.image}" style="height:30px;border:1px solid var(--line)">`:''}</td><td><b>${c.text?esc(c.text):'(blank)'}</b></td><td>${c.confidence}</td><td class="tag">${esc(c.decode)}${c.decode==='grammar'?' · '+esc(c.confidence_kind):''}</td></tr>`).join('')}</table>`:'<div class="tag">No cell had ink.</div>'}</div>`}
+
 let LABBOUND=false;
-async function labInit(){try{const o=await api('/api/playground/options'),cs=$('pgcard'),ms=$('lmodel'),cc=cs.value,cm=ms.value;
-  cs.innerHTML='<option value="">Detect the card (installed packs)</option>'+o.cards.map(c=>`<option value="${esc(c.id)}">${esc(c.id)}${c.pack_versions.length?'':' · no model yet'}</option>`).join('');cs.value=[...cs.options].some(x=>x.value===cc)?cc:'';
-  ms.innerHTML=o.models.map(m=>`<option value="${esc(m.id)}">${esc(m.label)}</option>`).join('');ms.value=[...ms.options].some(x=>x.value===cm)?cm:'card';
-  const sync=()=>{const on=!!cs.value;ms.disabled=!on;$('lpack').closest('label').style.display=on?'none':''};cs.onchange=sync;sync()}catch(e){$('lhelp').textContent='Could not load the card and model lists: '+e.message;window.__lerr=e.stack}
- try{const p=await api('/api/cleanup/packs'),sel=$('lpack'),cur=sel.value;sel.innerHTML='<option value="auto">Best match (newest on ties)</option>'+p.map(x=>`<option value="${esc(x.file)}">${esc(x.name)} · default: ${esc(x.default)}${x.has_reference?'':' · no contrast reference'}</option>`).join('');sel.value=[...sel.options].some(o=>o.value===cur)?cur:'auto'}catch(e){}
+async function labInit(){ try{const p=await api('/api/cleanup/packs'),sel=$('lpack'),cur=sel.value;sel.innerHTML='<option value="auto">Best match (newest on ties)</option>'+p.map(x=>`<option value="${esc(x.file)}">${esc(x.name)} · default: ${esc(x.default)}${x.has_reference?'':' · no contrast reference'}</option>`).join('');sel.value=[...sel.options].some(o=>o.value===cur)?cur:'auto'}catch(e){}
  if(!LABBOUND){LABBOUND=true;const z=$('ldrop');['dragover','dragenter'].forEach(e=>z.addEventListener(e,x=>{x.preventDefault();z.classList.add('over')}));['dragleave','drop'].forEach(e=>z.addEventListener(e,x=>{x.preventDefault();z.classList.remove('over')}));z.addEventListener('drop',e=>labRun(e.dataTransfer.files[0]));$('lfile').onchange=e=>{labRun(e.target.files[0]);e.target.value=''}}}
 async function labRun(f){if(!f)return;const o=$('lres');o.innerHTML='<div class="msg">Aligning and reading with every option…</div>';
- try{const card=$('pgcard').value,url=card?'/api/cleanup?card='+encodeURIComponent(card)+'&model='+encodeURIComponent($('lmodel').value):'/api/cleanup?pack='+encodeURIComponent($('lpack').value);const r=await api(url,{method:'POST',body:f});labShow(r)}catch(e){o.innerHTML=`<div class="msg bad">${esc(e.message)}</div>`}}
+ try{const r=await api('/api/cleanup?pack='+encodeURIComponent($('lpack').value),{method:'POST',body:f});labShow(r)}catch(e){o.innerHTML=`<div class="msg bad">${esc(e.message)}</div>`}}
 function labShow(r){const ok=r.methods.filter(m=>m.available),name=m=>m.label;
  const cards=r.methods.map(m=>m.available?`<div class="card" style="margin:0"><a href="${m.image}" target="_blank" rel="noopener"><img src="${m.image}" alt="${esc(m.label)}" style="width:100%;border:1px solid var(--line);border-radius:6px"></a>
    <div style="margin-top:8px"><b>${esc(m.label)}</b> ${m.is_pack_default?'<span class="badge bg-blue-lt">pack default</span>':''}</div>
@@ -775,8 +800,6 @@ function labShow(r){const ok=r.methods.filter(m=>m.available),name=m=>m.label;
  $('lres').innerHTML=`<div class="card"><h2>${esc(r.pack)} · ${r.inliers} inliers · photo covers ${r.covered_percent}% of the card</h2>
   <div class="tag">Pack default clean-up: ${esc(r.pack_default)}. Amber = flagged for review (confidence below the field's minimum).</div>
   <div class="charts" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">${cards}</div></div>
-  <div class="card"><h2>Every cell read (${(r.cells||[]).length} with ink)</h2>
-  ${(r.cells||[]).length?`<div class="tag">Amber = below the field's minimum confidence. Confidence is the posterior, the margin or the greedy minimum, as the field says.</div><table class="table table-vcenter"><tr><th>Field</th><th>Visit</th><th>Cell</th><th>Read</th><th>Confidence</th><th>Decode</th></tr>${r.cells.map(c=>`<tr class="${c.flagged?'warn':''}"><td>${esc(c.field)}</td><td>${c.visit}</td><td>${c.image?`<img src="${c.image}" style="height:30px;border:1px solid var(--line)">`:''}</td><td><b>${c.text?esc(c.text):'(blank)'}</b></td><td>${c.confidence}</td><td class="tag">${esc(c.decode)}${c.decode==='grammar'?' · '+esc(c.confidence_kind):''}</td></tr>`).join('')}</table>`:'<div class="tag">No cell had ink.</div>'}</div>
   <div class="card"><h2>Cells where the options disagree (${r.disagreements.length} of ${r.cells_total})</h2>
   ${r.disagreements.length?`<table class="table table-vcenter"><tr><th>Field</th><th>Visit</th>${ok.map(m=>`<th>${esc(m.label)}</th>`).join('')}</tr>${rows}</table>${r.disagreements.length>80?'<div class="tag">First 80 shown.</div>':''}`:'<div class="tag">Every option read every cell the same.</div>'}
   <ul class="tag" style="padding-left:18px;margin-top:10px">${r.notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul></div>`}

@@ -1,6 +1,6 @@
 """Card Studio: layout/template workflow. Binds 127.0.0.1 only. Stdlib + OpenCV; no network calls.
 Run: python server.py [--port 8770]"""
-import argparse, json, re, subprocess, sys, time, uuid
+import argparse, json, re, shutil, subprocess, sys, time, uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import csv
@@ -565,6 +565,7 @@ class H(BaseHTTPRequestHandler):
             if self.path == "/api/train/stop": return self._send(200, stop_training())
             if self.path == "/api/train/resume": return self._send(200, resume_training(json.loads(body or b"{}")))
             if self.path.split("?")[0] == "/api/cleanup": return self._cleanup(body, parse_qs(urlparse(self.path).query))
+            if self.path == "/api/pack/import": return self._import_pack(body)
             if self.path == "/api/template/grid": return self._save_grid(json.loads(body))
             if self.path == "/api/arch/check":
                 import archnet
@@ -657,13 +658,31 @@ class H(BaseHTTPRequestHandler):
         return self._send(200, {"upload_id": uid, "size": [bgr.shape[1], bgr.shape[0]], "matches": matches, "verdict": verdict,
                                 "thresholds": {"high": HIGH, "mid": MID}, "layout": detect_layout(bgr), "orientation": orient})
 
+    def _import_pack(self, data):
+        """Install a .cardpack made elsewhere into cardpack/out. It must validate (schemas, hashes, the reader runs); an id and version already installed is refused, never overwritten."""
+        import tempfile
+        if not data or len(data) > 120 * 1024 * 1024: raise ValueError("send one .cardpack file (up to 120 MB)")
+        with tempfile.NamedTemporaryFile(suffix=".cardpack", delete=False) as fh: fh.write(data); tmp = Path(fh.name)
+        try:
+            try: man = json.loads(cp.read(tmp)["manifest.json"])
+            except Exception: raise ValueError("not a card pack (a zip with manifest.json, template.png, grid.json, fields.json and reader.onnx)")
+            pid, ver = str(man.get("id", "")), man.get("version")
+            if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", pid) or not isinstance(ver, int) or ver < 0: raise ValueError("the pack has no usable id and version")
+            errs = cp.validate(tmp)
+            if errs: raise ValueError("the pack is not valid: " + "; ".join(errs[:4]))
+            dest = HERE.parent / "cardpack" / "out" / f"{pid}_v{ver}.cardpack"
+            if dest.exists(): raise ValueError(f"{dest.name} is already installed: change its version, or use the one that is there")
+            shutil.move(str(tmp), str(dest))
+        finally:
+            tmp.unlink(missing_ok=True)
+        self._send(200, {"file": dest.name, "id": pid, "version": ver})
+
     def _cleanup(self, data, q):
         """Clean-up lab: align one photo to a pack and read it with every photo clean-up option."""
         want = q.get("pack", ["auto"])[0]
         packs = cleanup.installed(); pack = None
         if q.get("card"):                                    # the playground: this card's template with the chosen model
             card = q["card"][0]
-            if not cards.exists(card): raise KeyError("no such card")
             UPLOADS.mkdir(exist_ok=True); purge_uploads()
             return self._send(200, cleanup.analyze(load_normalized(data), UPLOADS, pack=cleanup.build_pack(card, q.get("model", ["card"])[0]), packs=packs))
         if want != "auto":

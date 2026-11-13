@@ -6,42 +6,42 @@
    "file": "docs/screenshots/dashboard.png",
    "view": "dashboard",
    "caption": "Dashboard: model registry, getting started, activity, needs attention, field readiness",
-   "sha256": "bbc7507f3456760b6d5c38976a4ab398e671e363dac7f471cfe839ac73838530",
+   "sha256": "dd24c9640423a58202666ad955e16f71073a16d76ff6e28d4c10dc810d0cd131",
    "images_on_page": 0
   },
   {
    "file": "docs/screenshots/model-quality.png",
    "view": "model-quality",
    "caption": "Model quality: per-field errors, calibration, risk-coverage, confusions, flag-policy tuner, provenance",
-   "sha256": "feba19128342b4a6fe0af265298b84ee9f7ba89a6e08b36b6378405da75fe3f1",
+   "sha256": "eafe06385de35690dc0e103f6dc6d4fa4a99f82b85c0b89a2a35ff2abca05600",
    "images_on_page": 0
   },
   {
    "file": "docs/screenshots/history.png",
    "view": "history",
    "caption": "History: training runs, paired comparison, experiment records",
-   "sha256": "5ae0708e9677ab9f9769f5250f8057500b5d1eedb8614809787369715bf8755e",
+   "sha256": "0248bdeda86a55559ebf4dba7a0ccd1bd5d2b962afdfaf47abbc22557b4881f9",
    "images_on_page": 0
   },
   {
    "file": "docs/screenshots/train-and-ship.png",
    "view": "train-and-ship",
    "caption": "Train and ship: held-out gate per field",
-   "sha256": "56d44c313ede012aedf8adbc377680223731dc36dd1b4df6c40821213b28664a",
+   "sha256": "6ec89d94d6f7b4c4e753ae52a9fb50fba28e73bbb1dc07b9e85c9785cb09c2e0",
    "images_on_page": 0
   },
   {
    "file": "docs/screenshots/clean-up-lab.png",
    "view": "clean-up-lab",
    "caption": "Photo clean-up lab (empty state)",
-   "sha256": "1bf3f6e6a50b060a4145fa56dfc173d66a3ab264b20d2640b6ee4b68974d382c",
+   "sha256": "1063c68bf6dedccde70e7c236c0cacb944f40cfd9b3c7c637944e1097f51aed4",
    "images_on_page": 0
   },
   {
    "file": "docs/screenshots/label.png",
    "view": "label",
    "caption": "Label and import corrected labels",
-   "sha256": "75e438f13cccdbdb780413cf60395b510d5a85e622899d0e876dd3d5eff3e823",
+   "sha256": "e62bdc8b9dba3a8e0d92534486c6cd79347fad672c8c336d2d8be5f3ae57fad8",
    "images_on_page": 0
   }
  ]

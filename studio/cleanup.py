@@ -278,9 +278,13 @@ def analyze(photo, out_dir, pack=None, packs=None, methods=N.METHODS, preview_wi
 
 # ---------------------------------------------------------------- playground: any card with any model
 def _cards_with_template():
+    """Cards that have a template: Studio cards with a grid, plus the id of any installed pack that no card made (a pack brings its own template and rules)."""
     out = []
     for c in cards.list_cards():
-        if c["id"] == cards.LEGACY or c.get("grid"): out.append({"id": c["id"], "pack_versions": c["pack_versions"], "grid": c.get("grid")})
+        if c["id"] == cards.LEGACY or c.get("grid"): out.append({"id": c["id"], "pack_versions": c["pack_versions"], "grid": c.get("grid"), "from_pack": False})
+    have = {c["id"] for c in cards.list_cards()} | {cards.pack_id(c["id"]) for c in cards.list_cards()}
+    for pid in sorted({p.stem.rsplit("_v", 1)[0] for p in PACKS.glob("*_v*.cardpack")} - have):
+        out.append({"id": pid, "pack_versions": sorted(int(p.stem.rsplit("_v", 1)[1]) for p in PACKS.glob(f"{pid}_v*.cardpack")), "grid": None, "from_pack": True})
     return out
 
 
@@ -307,8 +311,10 @@ def model_options():
 def build_pack(card, model="card"):
     """A Pack made of `card`'s template, grid and field rules and the chosen reader. The card's newest pack supplies the rules when it has one (its decoding, thresholds, reference
     statistics); a card with no pack yet gets rules from its template. -> Pack"""
-    if not cards.exists(card): raise KeyError("no such card")
-    own = sorted((p for p in PACKS.glob(f"{cards.pack_id(card)}_v*.cardpack")), key=lambda p: int(p.stem.rsplit("_v", 1)[1]))
+    is_card = cards.exists(card)
+    if not is_card and not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", card or ""): raise KeyError("no such card")
+    own = sorted((p for p in PACKS.glob(f"{cards.pack_id(card) if is_card else card}_v*.cardpack")), key=lambda p: int(p.stem.rsplit("_v", 1)[1]))
+    if not is_card and not own: raise KeyError("no such card")
     members = cp.read(own[-1]) if own else cards.base_members(card)
     members = dict(members); label = None; reader_model = None
     if model in ("card", "", None):

@@ -149,3 +149,21 @@ class Playground(unittest.TestCase):
         except ImportError: self.skipTest("needs onnxruntime")
         pk = self.c.build_pack("anc", "pack:anc_v3.cardpack"); own = self.c.build_pack("anc", "card")
         self.assertIn("anc_v3", pk.name); self.assertEqual(pk.classes, own.classes); self.assertIsNone(pk.external)
+
+    @unittest.skipUnless((PACKS / "anc_v5.cardpack").exists(), "needs an installed pack")
+    def test_the_id_of_an_installed_pack_no_card_made_is_a_card(self):
+        import shutil, tempfile
+        from unittest import mock
+        import cardpack as cp
+        with tempfile.TemporaryDirectory() as d:
+            m = cp.read(PACKS / "anc_v5.cardpack"); man = json.loads(m["manifest.json"]); man["id"] = "zz_from_pack"; man["version"] = 3; m["manifest.json"] = json.dumps(man).encode()
+            cp.build(m, Path(d) / "zz_from_pack_v3.cardpack")
+            with mock.patch.object(self.c, "PACKS", Path(d)):
+                found = {c["id"]: c for c in self.c._cards_with_template()}
+                self.assertTrue(found["zz_from_pack"]["from_pack"]); self.assertEqual(found["zz_from_pack"]["pack_versions"], [3])
+                self.assertEqual(self.c.model_options()[0]["id"], "card")
+                with self.assertRaises(KeyError): self.c.build_pack("zz_not_there", "card")
+                with self.assertRaises(KeyError): self.c.build_pack("../x", "card")
+                try: import onnxruntime  # noqa: F401
+                except ImportError: return
+                self.assertIn("zz_from_pack", self.c.build_pack("zz_from_pack", "card").name)
