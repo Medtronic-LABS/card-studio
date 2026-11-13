@@ -6,7 +6,7 @@
    "file": "docs/screenshots/dashboard.png",
    "view": "dashboard",
    "caption": "Dashboard: model registry, getting started, activity, needs attention, field readiness",
-   "sha256": "932bd48a604438c21df9c90e4c246a8a38c17b048cf7dfda97326f59f54f66e8",
+   "sha256": "250abc6fe8197449be51846aff74952c543e20e6388a4b9297ffc5873f1308c3",
    "images_on_page": 0
   },
   {
@@ -27,7 +27,7 @@
    "file": "docs/screenshots/train-and-ship.png",
    "view": "train-and-ship",
    "caption": "Train and ship: held-out gate per field",
-   "sha256": "698442053bcbe554b4a437949d0aa059fbd541ebc514991242301de91f17f398",
+   "sha256": "ff0be1108ebdced5617dbc404cee6836759827f3f6088be7db612bb655349abf",
    "images_on_page": 0
   },
   {

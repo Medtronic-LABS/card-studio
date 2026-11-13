@@ -3,7 +3,8 @@
     {"preset": "light_lr3e-4",                                    the starting point: learning rate and augmentation strength
      "hp":     {"lr": 0.0005, "optimizer": "adamw", "weight_decay": 0.01, "batch": 32, "schedule": "cosine", "grad_clip": 1.0, "balance": true, "patience": 60,
                 "aug": {"rot": 3, "tx": 2, "ty": 1, "bright": 0.1, "shift": 8, "blur": 0.2, "noise": 4, "erase": 0.2}},
-     "arch":   "crnn-wide"  |  {"conv": [...], "context": [...], "rnn": {...}, "dropout": 0.3}  |  null (the shipped CRNN)}
+     "arch":   "crnn-wide"  |  {"conv": [...], "context": [...], "rnn": {...}, "dropout": 0.3}  |  null (the shipped CRNN),
+     "run":    {"checkpoint_every": 10, "keep_last": 2}}      how often to save a checkpoint (0 = only the best) and how many numbered ones to keep: not training values, so they do not make a run "custom"
 
 Everything is optional. A run with no settings is the shipped recipe, step for step. `load` returns what the trainer needs and what to record in results.json;
 `describe_all` is what the settings panels (Card Studio, the Frappe app) show: the presets, every value with its limits and default, and the architecture presets.
@@ -17,7 +18,7 @@ try:
 except ImportError:
     import archnet, hpspec
 
-HP_OPTIONS = {"optimizer": list(hpspec.OPTIMIZERS), "schedule": list(hpspec.SCHEDULES), "balance": [True, False]}
+HP_OPTIONS = {"optimizer": list(hpspec.OPTIMIZERS), "schedule": list(hpspec.SCHEDULES), "balance": [True, False], "monitor": list(hpspec.MONITORS), "restore": list(hpspec.RESTORES)}
 
 
 def load(path_or_dict, preset=hpspec.DEFAULT_PRESET):
@@ -29,14 +30,16 @@ def load(path_or_dict, preset=hpspec.DEFAULT_PRESET):
     elif path_or_dict:
         try: raw = json.loads(Path(path_or_dict).read_text())
         except (OSError, ValueError) as e: raise ValueError(f"cannot read the settings file: {e}")
-    if not isinstance(raw, dict): raise ValueError("the settings are an object with preset, hp and arch")
-    unknown = sorted(set(raw) - {"preset", "hp", "arch"})
+    if not isinstance(raw, dict): raise ValueError("the settings are an object with preset, hp, arch and run")
+    unknown = sorted(set(raw) - {"preset", "hp", "arch", "run"})
     if unknown: raise ValueError(f"unknown settings key(s): {', '.join(unknown)}")
     preset = raw.get("preset") or preset
     if preset not in hpspec.PRESETS: raise ValueError(f"unknown preset {preset!r}: {', '.join(hpspec.PRESETS)}")
     hp = raw.get("hp") or {}
     if not isinstance(hp, dict): raise ValueError("hp is an object of training values")
     cfg = hpspec.resolve(preset, hp)
+    if raw.get("run") is not None and not isinstance(raw.get("run"), dict): raise ValueError("run is an object of run settings (checkpoint_every, keep_last)")
+    run = hpspec.resolve_run(raw.get("run"))
     arch = raw.get("arch")
     if arch is not None:
         arch = archnet.normalize(arch)
@@ -45,8 +48,8 @@ def load(path_or_dict, preset=hpspec.DEFAULT_PRESET):
     shown = archnet.normalize(archnet.DEFAULT if arch is None else arch)
     name = "crnn" if arch is None else (raw["arch"] if isinstance(raw["arch"], str) else "custom")
     label = "the shipped CRNN" if arch is None else f"{name if name != 'custom' else 'a custom architecture'} ({archnet.describe(shown)['params'] / 1e6:.2f}M parameters)"
-    return {"preset": preset, "cfg": cfg, "arch": arch, "arch_label": label, "config_label": preset + ("+custom" if custom else ""),
-            "record": {"preset": preset, "hp": cfg, "arch": shown, "arch_name": name, "arch_hash": archnet.spec_hash(shown), "arch_params": archnet.describe(shown)["params"]}}
+    return {"preset": preset, "cfg": cfg, "run": run, "arch": arch, "arch_label": label, "config_label": preset + ("+custom" if custom else ""),
+            "record": {"preset": preset, "hp": cfg, "run": run, "arch": shown, "arch_name": name, "arch_hash": archnet.spec_hash(shown), "arch_params": archnet.describe(shown)["params"]}}
 
 
 def describe_all():
@@ -59,4 +62,5 @@ def describe_all():
     aug = {k: {"label": label, "min": hpspec.AUG_LIMITS[k][0], "max": hpspec.AUG_LIMITS[k][1]} for k, label in hpspec.AUG_LABELS.items()}
     return {"presets": hpspec.PRESETS, "default_preset": hpspec.DEFAULT_PRESET, "hp": hp, "aug": aug,
             "arch_presets": {k: {"label": v["label"], "spec": archnet.normalize(k), "hash": archnet.spec_hash(k), **archnet.describe(archnet.normalize(k))} for k, v in archnet.PRESETS.items()},
-            "arch_default": archnet.DEFAULT, "arch_limits": dict(archnet.LIMITS)}
+            "arch_default": archnet.DEFAULT, "arch_limits": dict(archnet.LIMITS),
+            "run": {k: {"default": hpspec.RUN_DEFAULTS[k], "min": hpspec.RUN_LIMITS[k][0], "max": hpspec.RUN_LIMITS[k][1], "label": {"checkpoint_every": "save a checkpoint every N epochs (0 = only the best)", "keep_last": "numbered checkpoints kept per fold"}[k]} for k in hpspec.RUN_DEFAULTS}}

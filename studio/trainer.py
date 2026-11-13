@@ -1,8 +1,9 @@
 """Studio train / gate / export for one card type (cards.py says where its labels, crops and template are). Local only.
 Labels (for anc: labels.csv + labels_new.csv, new wins) -> page-split 5-fold CV (every labeled cell predicted once by a model that never
 saw its page) -> gate per field -> final reader trained on ALL pages (epochs fixed from the CV) -> ONNX -> new pack version.
-Usage: python trainer.py RUN_DIR [--card anc] [--target 85] [--min-n 20] [--max-epochs 300] [--pretrained auto|legacy|NAME] [--config light_lr3e-4|light_lr1e-4|nbaug_lr1e-4]   (progress in RUN_DIR/status.json, result in RUN_DIR/results.json)"""
-import argparse, collections, csv, hashlib, json, random, statistics, sys, time, traceback
+Usage: python trainer.py RUN_DIR [--card anc] [--target 85] [--min-n 20] [--max-epochs 300] [--pretrained auto|legacy|NAME] [--config light_lr3e-4|light_lr1e-4|nbaug_lr1e-4]   (progress in RUN_DIR/status.json, result in RUN_DIR/results.json)
+Checkpoints, curves and STOP (a file RUN_DIR/STOP makes every worker finish its epoch, save and exit; stage "stopped"), continued with: python trainer.py RUN_DIR --resume"""
+import argparse, collections, csv, hashlib, json, os, random, statistics, sys, time, traceback
 from multiprocessing import Pool
 from pathlib import Path
 
@@ -52,7 +53,7 @@ def grammar_spec(card):
 
 
 def cv_job(a):
-    fold, folds, merged, card, max_epochs, gspec, weights, cfg, arch, seed = a
+    fold, folds, merged, card, max_epochs, gspec, weights, cfg, arch, seed = a[:10]; ck = a[10] if len(a) > 10 else None          # ck: where this run keeps checkpoints, curves, STOP (None = none of that)
     import torch; import common as C, train as T
     torch.set_num_threads(2); C.use_fields(cards.masks(card))
     rows = C.read_labels(merged); pre = torch.load(weights) if weights else None           # no weights: this architecture starts from scratch
@@ -60,7 +61,9 @@ def cv_job(a):
     vp = set(random.Random(1000 + fold).sample(rest, max(4, round(len(rest) / 7))))
     tr = [r for r in rows if r["page"] in rest and r["page"] not in vp]; va = [r for r in rows if r["page"] in vp]; te = [r for r in rows if r["page"] in test_pages]
     assert not ({r["page"] for r in tr + va} & test_pages)
-    m, info = T.finetune(pre, tr, va, cfg if isinstance(cfg, dict) else T.resolve_cfg(cfg), seed=seed, max_epochs=max_epochs, log=lambda *_: None, arch=arch)
+    fck = dict(ck, name=f"fold-{fold}", curves=str(Path(ck["curves"]) / f"fold-{fold}.json")) if ck else None
+    m, info = T.finetune(pre, tr, va, cfg if isinstance(cfg, dict) else T.resolve_cfg(cfg), seed=seed, max_epochs=max_epochs, log=lambda *_: None, arch=arch, ck=fck)
+    if info.get("stopped"): return fold, None, info["best_epoch"], info.get("hist", [])          # STOP: the -last checkpoint is written, this fold is not finished
     out = [dict(page=r["page"], row=r["row"], col=r["col"], label=r["label"], pred=p, conf=c) for (p, c), r in zip(T.predict_torch(m, te), te)]
     gi = [i for i, r in enumerate(te) if r["row"] in gspec]          # the same cells read again against the field's grammar, from the same model
     if gi:
@@ -69,23 +72,41 @@ def cv_job(a):
         with torch.no_grad(): lg = m(torch.from_numpy(np.stack([C.to_input(C.cell_image(te[i])) for i in gi])).unsqueeze(1)).numpy()
         for j, i in enumerate(gi):
             g = gspec[te[i]["row"]]; out[i]["pred_grammar"], out[i]["margin"] = constrained.decode(lg[:, j, :], masks[te[i]["row"]], g["kind"], g["range"], g["years"])
+    if ck:
+        import train as _T; _T.write_json_atomic(Path(ck["done"]) / f"fold-{fold}.json", {"fold": fold, "out": out, "best": info["best_epoch"], "hist": info.get("hist", [])})
     return fold, out, info["best_epoch"], info.get("hist", [])
 
 
-def train_fixed(pre, rows, epochs, seed=0, cfg=CFG, arch=None):
+def train_fixed(pre, rows, epochs, seed=0, cfg=CFG, arch=None, ck=None):
     """The final reader: all labeled pages, a fixed number of epochs (the median best epoch of the folds). cfg: a preset name or a resolved config; arch: None for the shipped CRNN;
-    pre: starting weights or None."""
+    pre: starting weights or None. ck: a Checkpointer config (train.py) for the final reader's checkpoints / curves / STOP / resume; -> None when STOP ended it before the last epoch."""
     import torch, torch.nn as nn
     import common as C, train as T
     torch.set_num_threads(6); torch.manual_seed(seed)
     cfg = cfg if isinstance(cfg, dict) else T.resolve_cfg(cfg)
     model = T.new_model(arch)
     if pre is not None: model.load_state_dict(pre)
-    dl, opt, sch = T.training_setup(model, rows, cfg, seed, epochs); ctc = nn.CTCLoss(blank=C.BLANK_IDX, zero_infinity=True)
-    for ep in range(epochs):
-        T.train_epoch(model, dl, opt, ctc, cfg.get("grad_clip", 0.0))
-        if sch: sch.step()
+    dl, opt, sch = T.training_setup(model, rows, cfg, seed, epochs, mode="min"); ctc = nn.CTCLoss(blank=C.BLANK_IDX, zero_infinity=True)      # no validation pages here: a plateau schedule watches the training loss
+    plateau = cfg.get("schedule", "none") == "plateau"; cp = T.Checkpointer(ck) if ck else None; hist, start = [], 1
+    st = cp.load_last() if cp else None
+    if st and st.get("epochs") == epochs:
+        model.load_state_dict(st["model"]); opt.load_state_dict(st["opt"]); hist, start = st["hist"], st["epoch"] + 1; T._rng_set(dl, st["rng"])
+        if sch and st.get("sched") is not None: sch.load_state_dict(st["sched"])
+    for ep in range(start, epochs + 1):
+        lr = opt.param_groups[0]["lr"]; loss = T.train_epoch(model, dl, opt, ctc, cfg.get("grad_clip", 0.0))
+        if sch: sch.step(loss) if plateau else sch.step()
+        hist.append({"epoch": ep, "loss": loss, "lr": lr})
+        if cp:
+            cp.write_curves(hist)
+            def full(): return {"model": model.state_dict(), "opt": opt.state_dict(), "sched": sch.state_dict() if sch else None, "epoch": ep, "epochs": epochs, "hist": hist, "rng": T._rng_get(dl)}
+            if cp.due(ep): cp.save_numbered(ep, model.state_dict()); cp.save_last(full())
+            if ep == epochs: cp.save_last(full())
+            elif cp.stop_requested(): cp.save_last(full()); return None
     return model
+
+
+def write_json(path, obj):
+    tmp = Path(str(path) + ".tmp"); tmp.write_text(json.dumps(obj)); os.replace(tmp, path)
 
 
 def metrics(recs):
@@ -106,17 +127,36 @@ def main():
     ap.add_argument("--cv-only", action="store_true", help="stop after cross-validation: write cv_predictions.json and a short results.json, train no final reader and write no pack (what seed experiments use)")
     ap.add_argument("--settings", default=None, help="JSON file: {\"preset\": ..., \"hp\": {every training value}, \"arch\": a preset name or an architecture spec (archnet.py)}; see settings.py")
     ap.add_argument("--card", default=cards.LEGACY); ap.add_argument("--pretrained", default="auto", help="starting weights: auto (studio/pretrained/DEFAULT, else legacy), legacy, or a name from pretrained.py list"); ap.add_argument("--max-epochs", type=int, default=300, help="cap per CV fold (lower only for a quick trial)")
-    a = ap.parse_args(); run = Path(a.run_dir); run.mkdir(parents=True, exist_ok=True); t0 = time.time()
+    ap.add_argument("--resume", action="store_true", help="continue a stopped or failed run from RUN_DIR/checkpoints (RUN_DIR/trainer_args.json holds everything else; no other option may be given)")
+    a = ap.parse_args(); run = Path(a.run_dir); settings_raw = None
+    if a.resume:
+        clash = sorted(k for k, v in vars(a).items() if k not in ("run_dir", "resume") and v != ap.get_default(k))
+        if clash: ap.error(f"--resume takes only RUN_DIR: the settings come from trainer_args.json (also given: {', '.join('--' + k.replace('_', '-') for k in clash)})")
+        if not (run / "trainer_args.json").is_file(): ap.error(f"cannot resume: {run / 'trainer_args.json'} not found (not a run directory this trainer started)")
+        saved = json.loads((run / "trainer_args.json").read_text()); settings_raw = saved.get("settings_raw")
+        for k, v in saved["args"].items(): setattr(a, k, v)
+        a.resume = True; (run / "STOP").unlink(missing_ok=True)          # the STOP that ended the last run must not end this one
+    run.mkdir(parents=True, exist_ok=True); t0 = time.time(); fold_epochs = {}
     def status(stage, detail="", **kw):
-        json.dump(dict(stage=stage, detail=detail, elapsed=round(time.time() - t0), target=a.target, min_n=a.min_n, card=a.card, **kw), open(run / "status.json", "w"))
+        if "resumable" not in kw and stage == "error": kw["resumable"] = any((run / "checkpoints").glob("*.pt"))
+        if fold_epochs: kw.setdefault("fold_epochs", fold_epochs)
+        write_json(run / "status.json", dict(stage=stage, detail=detail, elapsed=round(time.time() - t0), target=a.target, min_n=a.min_n, card=a.card, **kw))
     try:
         status("labels", "merging labels")
         if not cards.exists(a.card): raise ValueError(f"no such card: {a.card}")
         import settings as S
-        sett = S.load(a.settings, a.config); a.config = sett["preset"]; arch, cfg = sett["arch"], sett["cfg"]          # fails early, with the reason, when a value or the architecture is wrong
+        if not a.resume and a.settings:
+            try: settings_raw = json.loads(Path(a.settings).read_text())
+            except (OSError, ValueError): settings_raw = None
+        sett = S.load(settings_raw if a.resume or settings_raw is not None else a.settings, a.config); a.config = sett["preset"]; arch, cfg = sett["arch"], sett["cfg"]          # fails early, with the reason, when a value or the architecture is wrong
+        ck_run = sett["run"]; early = dict(monitor=cfg["monitor"], min_delta=cfg["min_delta"], restore=cfg["restore"], patience=cfg["patience"], plateau_patience=cfg["plateau_patience"])
+        ck_rec = dict(every=ck_run["checkpoint_every"], keep_last=ck_run["keep_last"])
+        if not a.resume: write_json(run / "trainer_args.json", {"args": {k: v for k, v in vars(a).items() if k != "resume"}, "settings_raw": settings_raw, "settings": sett["record"]})
         weights, wrec = pretrained.resolve(a.pretrained, arch)      # fails early, with the reason, when the weights cannot be used (or were made for another network)
         status("labels", f"starting weights: {wrec['name']}" + (f" ({wrec['note']})" if wrec.get("note") else "") + f" · network: {sett['arch_label']}")
-        merged = run / "merged_labels.csv"; dropped = {}; rows = merge_labels(merged, a.card, dropped); layouts = merge_labels.layouts
+        merged = run / "merged_labels.csv"; dropped = {}; old_sha = hashlib.sha256(merged.read_bytes()).hexdigest() if a.resume and merged.exists() else None
+        rows = merge_labels(merged, a.card, dropped); layouts = merge_labels.layouts
+        if old_sha and old_sha != hashlib.sha256(merged.read_bytes()).hexdigest(): raise ValueError("the labels changed since this run stopped: its checkpoints no longer match; start a new run")
         whole = {(r["page"], r["row"], r["col"]): r["label"] for r in rows}
         with open(merged, newline="") as fh: n_train = sum(1 for _ in csv.DictReader(fh))
         pages = sorted({r["page"] for r in rows})
@@ -129,11 +169,32 @@ def main():
         split_bytes = json.dumps({"seed": SEED, "unit": unit, "folds": folds}, sort_keys=True).encode()
         (run / "folds.json").write_bytes(split_bytes)
         status("cv", f"{len(rows)} labeled cells, {len(pages)} pages; 0 of 5 folds done", cv_done=0)
-        preds, bests, curves = [], [], []; gspec = grammar_spec(a.card)
-        with Pool(5) as pool:
-            for fold, out, best, hist in pool.imap_unordered(cv_job, [(f, folds, str(merged), a.card, a.max_epochs, gspec, str(weights) if weights else None, cfg, arch, a.seed) for f in range(5)]):
-                preds += out; bests.append(best); curves.append({"fold": fold, "best_epoch": best, "history": hist})
-                status("cv", f"{len(bests)} of 5 folds done", cv_done=len(bests))
+        preds, bests, curves = [], [], []; gspec = grammar_spec(a.card); stopped_folds = []
+        ck = dict(dir=str(run / "checkpoints"), every=ck_run["checkpoint_every"], keep_last=ck_run["keep_last"], stop=str(run / "STOP"), curves=str(run / "curves"), done=str(run / "folds_done"), resume=a.resume)
+        def read_epochs(fs):
+            for f in fs:
+                try: fold_epochs[str(f)] = len(json.loads((run / "curves" / f"fold-{f}.json").read_text()))
+                except (OSError, ValueError): pass
+        def finish(fold, out, best, hist):
+            if out is None: stopped_folds.append(fold); return
+            preds.extend(out); bests.append(best); curves.append({"fold": fold, "best_epoch": best, "history": hist})
+        todo = []
+        for f in range(5):
+            dn = run / "folds_done" / f"fold-{f}.json"
+            if a.resume and dn.exists(): d = json.loads(dn.read_text()); finish(d["fold"], d["out"], d["best"], d["hist"]); read_epochs([f])
+            else: todo.append(f)
+        status("cv", f"{len(rows)} labeled cells, {len(pages)} pages; {len(bests)} of 5 folds done", cv_done=len(bests))
+        if todo:
+            with Pool(5) as pool:
+                pending = {f: pool.apply_async(cv_job, ((f, folds, str(merged), a.card, a.max_epochs, gspec, str(weights) if weights else None, cfg, arch, a.seed, ck),)) for f in todo}
+                while pending:
+                    for f, r in list(pending.items()):
+                        if r.ready(): finish(*r.get()); read_epochs([f]); del pending[f]
+                    read_epochs(pending); status("cv", f"{len(bests)} of 5 folds done", cv_done=len(bests))
+                    if pending: next(iter(pending.values())).wait(2)
+        if stopped_folds:
+            status("stopped", f"stopped during cross-validation: {len(bests)} of 5 folds finished, folds {sorted(stopped_folds)} saved at epochs " + ", ".join(f"{f}: {fold_epochs.get(str(f), '?')}" for f in sorted(stopped_folds)) + "; resume with --resume", cv_done=len(bests), resumable=True)
+            return
         assert len(preds) == n_train and len({(p["page"], p["row"], p["col"]) for p in preds}) == n_train
         parts_preds = preds; preds = subcells.compose(preds, layouts, whole) if layouts else preds       # two-line cells are scored as whole cells
         assert len(preds) == len(rows) or layouts, "every labeled cell must have exactly one cross-validation read"
@@ -141,14 +202,19 @@ def main():
         epochs = int(statistics.median(bests))
         if a.cv_only:
             json.dump(preds, open(run / "cv_predictions.json", "w"))
-            json.dump(dict(card=a.card, cv_only=True, seed=a.seed, settings=sett["record"], cv_all=overall, best_epochs=sorted(bests), n_cells=len(rows), n_pages=len(pages), split_unit=unit, minutes=round((time.time() - t0) / 60, 1),
+            json.dump(dict(card=a.card, cv_only=True, seed=a.seed, settings=sett["record"], early_stopping=early, checkpoints=ck_rec, cv_all=overall, best_epochs=sorted(bests), n_cells=len(rows), n_pages=len(pages), split_unit=unit, minutes=round((time.time() - t0) / 60, 1),
                            fields=[dict(field=k, **v) for k, v in sorted(cv.items(), key=lambda kv: -kv[1]["n"])]), open(run / "results.json", "w"), indent=1)
             status("done", "cross-validation only: no final reader and no pack"); return
         status("final", f"training the reader on all {len(pages)} pages for {epochs} epochs (median best epoch of the folds)", cv_done=5)
         import torch, common as C, train as T
         C.use_fields(cards.masks(a.card))
         pre = torch.load(weights) if weights else None
-        model = train_fixed(pre, C.read_labels(merged), epochs, seed=a.seed, cfg=cfg, arch=arch); model.eval()
+        model = train_fixed(pre, C.read_labels(merged), epochs, seed=a.seed, cfg=cfg, arch=arch, ck=dict(ck, name="final", curves=str(run / "curves" / "final.json")))
+        if model is None:
+            try: fe = len(json.loads((run / "curves" / "final.json").read_text()))
+            except (OSError, ValueError): fe = "?"
+            status("stopped", f"stopped during the final training at epoch {fe} of {epochs}; resume with --resume", cv_done=5, resumable=True); return
+        model.eval()
         status("export", "ONNX export and parity check")
         import numpy as np, onnxruntime as ort
         onnx_path = run / "reader.onnx"; torch.set_num_threads(2)
@@ -208,7 +274,7 @@ def main():
         errs = cp.validate(out_pack)
         crops_note = "stored gray crops (work/crops) or imported crops" if a.card == cards.LEGACY else f"stored gray crops (studio/cards/{a.card}/crops) or imported crops"
         overall_greedy = overall; overall = metrics([dict(p, row="ALL", pred=p["pred_grammar"] if dec.get(p["row"], {}).get("decode") == "grammar" else p["pred"]) for p in preds])["ALL"]
-        res = dict(card=a.card, pretrained={"name": wrec["name"], "sha256": pretrained.sha256(weights)[:16] if weights else None, "images": wrec.get("images"), "epochs": wrec.get("epochs"), "generator": wrec.get("generator")}, cv_all_greedy=overall_greedy, decode=dec, split_unit=unit, split_units=n_units, dropped_labels=dropped, config=a.config, settings=sett["record"], target=a.target, min_n=a.min_n, n_cells=len(rows), n_pages=len(pages), folds=[len(f) for f in folds], best_epochs=sorted(bests),
+        res = dict(card=a.card, pretrained={"name": wrec["name"], "sha256": pretrained.sha256(weights)[:16] if weights else None, "images": wrec.get("images"), "epochs": wrec.get("epochs"), "generator": wrec.get("generator")}, cv_all_greedy=overall_greedy, decode=dec, split_unit=unit, split_units=n_units, dropped_labels=dropped, config=a.config, settings=sett["record"], early_stopping=early, checkpoints=ck_rec, target=a.target, min_n=a.min_n, n_cells=len(rows), n_pages=len(pages), folds=[len(f) for f in folds], best_epochs=sorted(bests),
                    final_epochs=epochs, cv_all=overall, parity=parity, tflite=tfl, minutes=round((time.time() - t0) / 60, 1),
                    fields=[dict(field=k, **v, decode=dec.get(k, {}).get("decode", "greedy"), status=gate.get(k, ("needs-review", ""))[0], reason=gate.get(k, ("", ""))[1]) for k, v in sorted(cv.items(), key=lambda kv: -kv[1]["n"])],
                    unlabeled_fields=[f["key"] for f in fld["fields"] if f["key"] not in cv],

@@ -8,7 +8,7 @@ import cv2
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cardpack"))
 import cardpack as cp
 from detect import detect_layout, load_normalized, match_score
-import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize, labruns, pretrained, external, extreader, testset, seedexp, settings as train_settings
+import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize, labruns, pretrained, external, extreader, testset, seedexp, datachecks, settings as train_settings
 from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
@@ -166,8 +166,10 @@ def train_status():
     st = json.loads((d / "status.json").read_text())
     alive = _proc is not None and _proc.poll() is None
     stale = time.time() - (d / "status.json").stat().st_mtime > 900
-    state = st["stage"] if st["stage"] in ("done", "error") else ("running" if alive or not stale else "stalled")
+    state = st["stage"] if st["stage"] in ("done", "error", "stopped") else ("running" if alive or not stale else "stalled")
     out = {"state": state, "run": d.name, **st}
+    out["resumable"] = bool(st.get("resumable")) and not alive and (d / "trainer_args.json").exists()
+    out["running"] = alive
     if (d / "results.json").exists():
         out["results"] = json.loads((d / "results.json").read_text())
     return out
@@ -198,8 +200,63 @@ def start_training(req):
     cmd = [sys.executable, str(HERE / "trainer.py"), str(d), "--card", card, "--target", str(target), "--min-n", str(min_n), "--pretrained", start, "--max-epochs", str(max_epochs)]
     if sett:
         (d / "settings.json").write_text(json.dumps(sett, indent=1)); cmd += ["--settings", str(d / "settings.json")]
-    _proc = subprocess.Popen(cmd, stdout=open(d / "log.txt", "w"), stderr=subprocess.STDOUT, cwd=str(HERE))
+    _proc = subprocess.Popen(cmd, stdout=open(d / "log.txt", "w"), stderr=subprocess.STDOUT, cwd=str(HERE)); _cur["dir"] = d
     return {"run": d.name, "card": card}
+
+
+_cur = {"dir": None}                       # the run directory of the process in _proc
+RUN_NAME = re.compile(r"^run-[0-9-]+$")    # a run made by start_training
+CURVE_RUN = re.compile(r"^[\w-]{1,60}$")   # any run directory name (older runs are called run1 ...)
+
+
+def _busy():
+    return ((_proc is not None and _proc.poll() is None) or (_seed["proc"] is not None and _seed["proc"].poll() is None)
+            or (_pre["proc"] is not None and _pre["proc"].poll() is None))
+
+
+def stop_training():
+    """Ask the running training to stop after the current epoch (it keeps its checkpoints): write STOP in its run directory."""
+    d = _cur["dir"]
+    if _proc is None or _proc.poll() is not None or d is None:
+        raise ValueError("no training run is running, so there is nothing to stop")
+    (d / "STOP").write_text("stop\n")
+    return {"run": d.name, "stopping": True}
+
+
+def resume_training(req):
+    """Continue a stopped (or failed) run from its checkpoints: python trainer.py RUN_DIR --resume. Same one-heavy-job rule as a new run."""
+    global _proc
+    name = str(req.get("run", ""))
+    if not RUN_NAME.match(name): raise ValueError("bad run name")
+    d = RUNS / name
+    if not d.is_dir(): raise KeyError("no such run")
+    if _busy(): raise ValueError("a training, pretraining or seed run is already in progress: one heavy job at a time")
+    if not (d / "trainer_args.json").exists(): raise ValueError("this run has no trainer_args.json, so it cannot be resumed")
+    try: st = json.loads((d / "status.json").read_text())
+    except (OSError, ValueError): raise ValueError("this run has no readable status")
+    if st.get("stage") == "done": raise ValueError("this run already finished: nothing to resume")
+    try: (d / "STOP").unlink()
+    except OSError: pass
+    st.update(stage="labels", detail="resuming", resumable=False)
+    (d / "status.json").write_text(json.dumps(st))
+    _proc = subprocess.Popen([sys.executable, str(HERE / "trainer.py"), str(d), "--resume"], stdout=open(d / "log.txt", "a"), stderr=subprocess.STDOUT, cwd=str(HERE)); _cur["dir"] = d
+    return {"run": d.name, "resumed": True}
+
+
+def run_curves(run):
+    """{"folds": {"0": [...]}, "final": [...]} from the trainer's curves directory ({} lists when it has none)."""
+    if not CURVE_RUN.match(run): raise ValueError("bad run name")
+    c = RUNS / run / "curves"; out = {"folds": {}, "final": []}
+    def read(f):
+        try: v = json.loads(f.read_text())
+        except (OSError, ValueError): return None          # being rewritten right now: the next poll gets it
+        return v if isinstance(v, list) else None
+    if c.is_dir():
+        for f in sorted(c.glob("fold-*.json"), key=lambda f: f.name):
+            k = f.stem[5:]
+            if k.isdigit() and (v := read(f)) is not None: out["folds"][k] = v
+        if (c / "final.json").exists(): out["final"] = read(c / "final.json") or []
+    return out
 
 
 _seed = {"proc": None}
@@ -472,6 +529,14 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/import/summary": return self._send(200, corrections.summary())
         if p == "/api/training": return self._send(200, training_status())
         if p == "/api/train/status": return self._send(200, train_status())
+        m = re.fullmatch(r"/api/run/([^/]+)/curves", p)
+        if m:
+            try: return self._send(200, run_curves(m[1]))
+            except ValueError as e: return self._err(400, str(e))
+        m = re.fullmatch(r"/api/card/([\w-]{1,40})/checklist", p)
+        if m:
+            if not cards.exists(m[1]): return self._err(404, "no such card")
+            return self._send(200, datachecks.checklist(m[1]))
         m = re.fullmatch(r"/api/template/([\w-]+)/(\d+)/grid", p)
         if m:
             q = parse_qs(urlparse(self.path).query)
@@ -495,6 +560,8 @@ class H(BaseHTTPRequestHandler):
             if self.path.split("?")[0] == "/api/analyze": return self._analyze(body, parse_qs(urlparse(self.path).query))
             if self.path == "/api/save": return self._save(json.loads(body))
             if self.path == "/api/train/start": return self._send(200, start_training(json.loads(body or b"{}")))
+            if self.path == "/api/train/stop": return self._send(200, stop_training())
+            if self.path == "/api/train/resume": return self._send(200, resume_training(json.loads(body or b"{}")))
             if self.path.split("?")[0] == "/api/cleanup": return self._cleanup(body, parse_qs(urlparse(self.path).query))
             if self.path == "/api/template/grid": return self._save_grid(json.loads(body))
             if self.path == "/api/arch/check":

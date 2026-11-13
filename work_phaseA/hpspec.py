@@ -12,13 +12,18 @@ PRESETS = {
     "nbaug_lr1e-4": dict(lr=1e-4, aug=dict(rot=3, tx=3, ty=2, bright=.15, shift=15, blur=.30)),
 }
 DEFAULT_PRESET = "light_lr3e-4"          # chosen on validation in Phase A (selection.json)
-HP_DEFAULTS = dict(optimizer="adam", weight_decay=0.0, batch=64, schedule="none", step_every=50, step_gamma=0.5, grad_clip=0.0, balance=True, patience=80)
+HP_DEFAULTS = dict(optimizer="adam", weight_decay=0.0, batch=64, schedule="none", step_every=50, step_gamma=0.5, grad_clip=0.0, balance=True, patience=80,
+                   monitor="exact", min_delta=0.0, restore="best", plateau_patience=10)
 AUG_DEFAULTS = dict(rot=0.0, tx=0.0, ty=0.0, bright=0.0, shift=0.0, blur=0.0, noise=0.0, erase=0.0)
-HP_LIMITS = dict(lr=(1e-6, 1e-1), weight_decay=(0.0, 0.1), batch=(4, 256), step_every=(1, 500), step_gamma=(0.05, 0.95), grad_clip=(0.0, 100.0), patience=(3, 500))
+HP_LIMITS = dict(lr=(1e-6, 1e-1), weight_decay=(0.0, 0.1), batch=(4, 256), step_every=(1, 500), step_gamma=(0.05, 0.95), grad_clip=(0.0, 100.0), patience=(3, 500), min_delta=(0.0, 0.2), plateau_patience=(1, 100))
 AUG_LIMITS = dict(rot=(0.0, 15.0), tx=(0.0, 20.0), ty=(0.0, 10.0), bright=(0.0, 0.6), shift=(0.0, 60.0), blur=(0.0, 1.0), noise=(0.0, 40.0), erase=(0.0, 0.8))
-OPTIMIZERS, SCHEDULES = ("adam", "adamw", "sgd"), ("none", "cosine", "step")
+OPTIMIZERS, SCHEDULES = ("adam", "adamw", "sgd"), ("none", "cosine", "step", "plateau")
+MONITORS, RESTORES = ("exact", "cer", "loss"), ("best", "last")          # what early stopping watches on the validation pages, and which weights a fold keeps when it stops
+RUN_DEFAULTS = dict(checkpoint_every=10, keep_last=2)                    # not training values: how often a fold or the final reader saves a checkpoint, and how many numbered ones are kept (the best is always kept)
+RUN_LIMITS = dict(checkpoint_every=(0, 100), keep_last=(1, 10))
 HP_LABELS = {"lr": "learning rate", "optimizer": "optimizer", "weight_decay": "weight decay", "batch": "batch size", "schedule": "learning-rate schedule", "step_every": "epochs between steps (step schedule)",
-             "step_gamma": "step factor (step schedule)", "grad_clip": "gradient clip (0 = off)", "balance": "balance fields when sampling", "patience": "early stopping patience, epochs"}
+             "step_gamma": "step / plateau factor (step and plateau schedules)", "grad_clip": "gradient clip (0 = off)", "balance": "balance fields when sampling", "patience": "early stopping patience, epochs", "monitor": "early stopping watches",
+             "min_delta": "smallest improvement that counts", "restore": "weights kept when a fold stops", "plateau_patience": "epochs without progress before the plateau schedule lowers the rate"}
 AUG_LABELS = {"rot": "rotation, degrees", "tx": "shift sideways, pixels", "ty": "shift up/down, pixels", "bright": "brightness variation", "shift": "gray-level shift", "blur": "chance of blur",
               "noise": "pixel noise, gray levels", "erase": "chance of a missing patch"}
 
@@ -42,11 +47,28 @@ def resolve(base, overrides=None, presets=None):
         except (TypeError, ValueError): raise ValueError(f"{name} must be a number")
         if not lo <= x <= hi: raise ValueError(f"{name} must be between {lo} and {hi}")
         return x
-    for k in ("lr", "weight_decay", "step_gamma", "grad_clip"): full[k] = num(k, full[k], *HP_LIMITS[k])
-    for k in ("batch", "step_every", "patience"): full[k] = num(k, full[k], *HP_LIMITS[k], int)
+    for k in ("lr", "weight_decay", "step_gamma", "grad_clip", "min_delta"): full[k] = num(k, full[k], *HP_LIMITS[k])
+    for k in ("batch", "step_every", "patience", "plateau_patience"): full[k] = num(k, full[k], *HP_LIMITS[k], int)
     if full["optimizer"] not in OPTIMIZERS: raise ValueError(f"optimizer is one of {', '.join(OPTIMIZERS)}")
     if full["schedule"] not in SCHEDULES: raise ValueError(f"schedule is one of {', '.join(SCHEDULES)}")
+    if full["monitor"] not in MONITORS: raise ValueError(f"monitor is one of {', '.join(MONITORS)}")
+    if full["restore"] not in RESTORES: raise ValueError(f"restore is one of {', '.join(RESTORES)}")
     full["balance"] = bool(full["balance"])
     for k in aug: aug[k] = num(f"augmentation {k}", aug[k], *AUG_LIMITS[k])
     full["aug"] = aug
     return full
+
+
+def resolve_run(raw=None):
+    """The run settings (how often to checkpoint, how many numbered checkpoints to keep) -> full, validated dict. Raises ValueError naming the bad value."""
+    raw = dict(raw or {})
+    unknown = sorted(set(raw) - set(RUN_DEFAULTS))
+    if unknown: raise ValueError(f"unknown run setting(s): {', '.join(unknown)}")
+    out = {**RUN_DEFAULTS, **raw}
+    for k, (lo, hi) in RUN_LIMITS.items():
+        if isinstance(out[k], bool): raise ValueError(f"{k} must be a whole number")
+        try: v = int(out[k])
+        except (TypeError, ValueError): raise ValueError(f"{k} must be a whole number")
+        if not lo <= v <= hi: raise ValueError(f"{k} must be between {lo} and {hi}")
+        out[k] = v
+    return out
