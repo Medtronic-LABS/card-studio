@@ -330,7 +330,6 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/external": return self._send(200, {"models": external.list_all(), "profiles": {k: v["label"] for k, v in extreader.PROFILES.items()}})
         if p == "/api/external/hf":
             repo = parse_qs(urlparse(self.path).query).get("repo", [""])[0]
-            if not re.fullmatch(r"[\w.-]{1,96}/[\w.-]{1,96}", repo): return self._err(400, "repo looks like owner/name")
             try: return self._send(200, external.hf_info(repo))
             except ValueError as e: return self._err(400, str(e))
         if p == "/api/scans": return self._send(200, scans.summaries())

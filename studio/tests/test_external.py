@@ -51,6 +51,13 @@ class Registry(unittest.TestCase):
         self.assertEqual((r["overall"]["n"], r["overall"]["correct"]), (3, 2)); self.assertEqual(r["by_field"]["weight"]["correct"], 1); self.assertEqual(r["skipped"]["two_line_cells"], 4)
         self.assertEqual(external.list_all()[0]["benchmarks"][0]["card"], "anc")
 
+    def test_a_pasted_link_or_id_becomes_owner_name(self):
+        for text, want in (("PaddlePaddle/PP-OCRv6_small_rec_onnx", "PaddlePaddle/PP-OCRv6_small_rec_onnx"), ("  https://huggingface.co/mhabrar/Orus-OCR-V0  ", "mhabrar/Orus-OCR-V0"),
+                           ("huggingface.co/mhabrar/Orus-OCR-V0/tree/main/inference", "mhabrar/Orus-OCR-V0"), ("https://huggingface.co/a/b?library=onnx", "a/b"), ("a/b/", "a/b")):
+            self.assertEqual(external.normalize_repo(text), want, text)
+        for bad in ("", "justaname", "https://huggingface.co/datasets/o/n", "a b/c", "a/b/c/d", "https://example.com/a/b"):
+            with self.assertRaises(ValueError, msg=bad): external.normalize_repo(bad)
+
     def test_hugging_face_import_needs_the_licence_accepted_first(self):
         with self.assertRaisesRegex(ValueError, "licence must be accepted"): external.hf_import("o/n", "x", "m.onnx", "c.json", "paddle-rec")
         with mock.patch.object(external, "hf_info", lambda repo: {"repo": repo, "licence": "mit", "gated": False, "url": "u", "files": [{"name": "m.onnx", "bytes": 10 ** 9}, {"name": "c.json", "bytes": 10}]}):

@@ -89,10 +89,22 @@ def reader(name):
 
 
 # ---------------------------------------------------------------- Hugging Face
+def normalize_repo(text):
+    """What a person pastes for a Hugging Face model -> `owner/name`: a bare id, or a link such as https://huggingface.co/owner/name/tree/main. Raises ValueError otherwise."""
+    import re
+    t = (text or "").strip().strip("/")
+    t = re.sub(r"^(https?://)?(www\.)?huggingface\.co/", "", t)
+    t = re.sub(r"[?#].*$", "", t)
+    m = re.match(r"^([\w.-]{1,96})/([\w.-]{1,96})(/.*)?$", t)
+    if not m or m[1] in ("datasets", "spaces", "models", "api") or (m[3] and not m[3].startswith(("/tree/", "/blob/", "/resolve/"))):
+        raise ValueError("write the model as owner/name (for example PaddlePaddle/PP-OCRv6_small_rec_onnx) or paste its Hugging Face link")
+    return f"{m[1]}/{m[2]}"
+
+
 def hf_info(repo):
     """What Hugging Face says about a model repo, before anything is downloaded. -> {repo, licence, gated, files: [{name, bytes}], url}. Uses your saved login only to see gated repos."""
     from huggingface_hub import HfApi
-    api = HfApi()
+    repo = normalize_repo(repo); api = HfApi()
     try: m = api.model_info(repo, files_metadata=True)
     except Exception as e: raise ValueError(f"cannot read {repo} on Hugging Face: {str(e)[:160]}")
     lic = next((t.split(":", 1)[1] for t in (m.tags or []) if t.startswith("license:")), "")
@@ -104,7 +116,7 @@ def hf_import(repo, name, onnx_file, charset_file, profile, accept_licence=False
     """Download the model file and its charset file from a Hugging Face repo and register them. The licence is read from the repo and recorded, and the caller
     must say it was shown to a person (accept_licence). A gated repo needs the access your saved login has. -> the record."""
     if not accept_licence: raise ValueError("the licence must be accepted first: show it to the person and pass accept_licence")
-    info = hf_info(repo); size = {f["name"]: f["bytes"] for f in info["files"]}
+    info = hf_info(repo); repo = info["repo"]; size = {f["name"]: f["bytes"] for f in info["files"]}
     for f in (onnx_file, charset_file):
         if f not in size: raise ValueError(f"{repo} has no file {f}")
     if size[onnx_file] > HF_FILE_LIMIT: raise ValueError(f"{onnx_file} is {size[onnx_file] // 1048576} MB: too large for a phone-sized recogniser (limit {HF_FILE_LIMIT // 1048576} MB)")
