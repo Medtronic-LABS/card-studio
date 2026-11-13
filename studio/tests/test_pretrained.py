@@ -51,3 +51,30 @@ class Registry(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class Networks(unittest.TestCase):
+    """Weights belong to one network: another architecture starts from scratch, or from weights pretrained for it."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(); t = Path(self.tmp.name); self.old = (P.DIR, P.LEGACY); P.DIR = t / "pretrained"; P.LEGACY = t / "legacy.pt"; P.LEGACY.write_bytes(b"legacy weights")
+        self.w = t / "w.pt"; self.w.write_bytes(b"some weights")
+
+    def tearDown(self):
+        P.DIR, P.LEGACY = self.old; self.tmp.cleanup()
+
+    def test_the_shipped_network_refuses_weights_made_for_another_and_the_other_way_round(self):
+        P.adopt("small1", self.w, arch="crnn-small"); P.adopt("shipped1", self.w)
+        self.assertEqual(P.resolve("shipped1")[1]["name"], "shipped1"); self.assertEqual(P.resolve("small1", "crnn-small")[1]["name"], "small1")
+        with self.assertRaisesRegex(ValueError, "different|not the one"): P.resolve("small1")
+        with self.assertRaisesRegex(ValueError, "not the one"): P.resolve("shipped1", "crnn-wide")
+        with self.assertRaisesRegex(ValueError, "not the one"): P.resolve("legacy", "crnn-small")
+
+    def test_another_network_with_no_weights_trains_from_scratch_and_auto_finds_its_own(self):
+        path, rec = P.resolve("auto", "crnn-wide"); self.assertEqual((path, rec["name"]), (None, "none")); self.assertIn("from scratch", rec["note"])
+        self.assertEqual(P.resolve("none")[0], None); self.assertEqual(P.resolve("none", "gru-crnn")[0], None)
+        P.adopt("wide1", self.w, arch="crnn-wide"); path, rec = P.resolve("auto", "crnn-wide"); self.assertEqual((path, rec["name"]), (P.DIR / "wide1.pt", "wide1"))
+        self.assertEqual(P.default_name(), "legacy"); self.assertEqual(P.resolve("auto")[1]["name"], "legacy")          # weights for another network never become the default of the shipped one
+
+    def test_the_record_says_which_network_it_is_for(self):
+        rec = P.adopt("g1", self.w, arch="gru-crnn"); self.assertEqual((rec["arch_name"], rec["arch_sha256"]), ("gru-crnn", P.arch_hash("gru-crnn"))); self.assertIn("gru-crnn", rec["architecture"])
+        by = {r["name"]: r for r in P.list_all()}; self.assertEqual(by["g1"]["arch"], "gru-crnn"); self.assertEqual(by["legacy"]["arch"], "crnn")
+

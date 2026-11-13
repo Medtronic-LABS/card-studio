@@ -8,7 +8,7 @@ import cv2
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cardpack"))
 import cardpack as cp
 from detect import detect_layout, load_normalized, match_score
-import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize, labruns, pretrained, external, extreader
+import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize, labruns, pretrained, external, extreader, settings as train_settings
 from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
@@ -186,12 +186,48 @@ def start_training(req):
     if not c["trainable"]:
         raise ValueError(f"{card} cannot be trained yet: {c['blocker']}")
     start = str(req.get("pretrained", "auto"))
-    pretrained.resolve(start)        # raises, saying why, when these starting weights cannot be used
+    max_epochs = int(req.get("max_epochs", 300))
+    if not 5 <= max_epochs <= 1000: raise ValueError("max_epochs must be 5-1000")
+    sett = req.get("settings") or {}
+    parsed = train_settings.load(sett)        # raises, saying what is wrong, for a bad value or architecture
+    pretrained.resolve(start, parsed["arch"])        # raises, saying why, when these starting weights cannot be used (or were made for another network)
     d = RUNS / time.strftime("run-%Y%m%d-%H%M%S"); d.mkdir(parents=True)
     json.dump({"stage": "labels", "detail": "starting", "elapsed": 0, "target": target, "min_n": min_n, "card": card}, open(d / "status.json", "w"))
-    _proc = subprocess.Popen([sys.executable, str(HERE / "trainer.py"), str(d), "--card", card, "--target", str(target), "--min-n", str(min_n), "--pretrained", start],
-                             stdout=open(d / "log.txt", "w"), stderr=subprocess.STDOUT, cwd=str(HERE))
+    cmd = [sys.executable, str(HERE / "trainer.py"), str(d), "--card", card, "--target", str(target), "--min-n", str(min_n), "--pretrained", start, "--max-epochs", str(max_epochs)]
+    if sett:
+        (d / "settings.json").write_text(json.dumps(sett, indent=1)); cmd += ["--settings", str(d / "settings.json")]
+    _proc = subprocess.Popen(cmd, stdout=open(d / "log.txt", "w"), stderr=subprocess.STDOUT, cwd=str(HERE))
     return {"run": d.name, "card": card}
+
+
+_pre = {"proc": None, "name": None, "log": None}
+
+
+def start_pretrain(req):
+    """Pretrain a network on synthetic cells in the background (python pretrained.py make ...): about 10 minutes for the shipped size, longer for a wider one."""
+    if _pre["proc"] is not None and _pre["proc"].poll() is None: raise ValueError("a pretraining run is already in progress")
+    name = str(req.get("name", ""))
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", name) or name == "legacy": raise ValueError("a name is letters, digits, _ and -, at most 32, and not legacy")
+    if any(r["name"] == name for r in pretrained.list_all()): raise ValueError(f"{name} already exists")
+    images, epochs = int(req.get("images", 30000)), int(req.get("epochs", 4))
+    if not (1000 <= images <= 200000 and 1 <= epochs <= 40): raise ValueError("images 1,000-200,000 and epochs 1-40")
+    import archnet
+    arch = req.get("arch"); cmd = [sys.executable, str(HERE / "pretrained.py"), "make", name, "--images", str(images), "--epochs", str(epochs)]
+    if arch is not None and not archnet.is_default(arch):
+        norm = archnet.normalize(arch); f = RUNS / f"pretrain-{name}.arch.json"; f.parent.mkdir(exist_ok=True); f.write_text(json.dumps(norm)); cmd += ["--arch", str(f)]
+    log = RUNS / f"pretrain-{name}.log"; log.parent.mkdir(exist_ok=True)
+    _pre.update(proc=subprocess.Popen(cmd, stdout=open(log, "w"), stderr=subprocess.STDOUT, cwd=str(HERE)), name=name, log=log)
+    return {"name": name}
+
+
+def pretrain_status():
+    p = _pre["proc"]
+    if p is None: return {"state": "none"}
+    tail = ""
+    try: tail = _pre["log"].read_text()[-400:]
+    except OSError: pass
+    state = "running" if p.poll() is None else ("done" if p.returncode == 0 else "failed")
+    return {"state": state, "name": _pre["name"], "tail": tail}
 
 
 MAX_EPOCHS = 300
@@ -327,6 +363,8 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/cards": return self._send(200, cards.list_cards())
         if p == "/api/jobs": return self._send(200, labruns.jobs())
         if p == "/api/pretrained": return self._send(200, pretrained.list_all())
+        if p == "/api/train/settings": return self._send(200, train_settings.describe_all())
+        if p == "/api/pretrain/status": return self._send(200, pretrain_status())
         if p == "/api/external": return self._send(200, {"models": external.list_all(), "profiles": {k: v["label"] for k, v in extreader.PROFILES.items()}})
         if p == "/api/external/hf":
             repo = parse_qs(urlparse(self.path).query).get("repo", [""])[0]
@@ -425,6 +463,10 @@ class H(BaseHTTPRequestHandler):
             if self.path == "/api/train/start": return self._send(200, start_training(json.loads(body or b"{}")))
             if self.path.split("?")[0] == "/api/cleanup": return self._cleanup(body, parse_qs(urlparse(self.path).query))
             if self.path == "/api/template/grid": return self._save_grid(json.loads(body))
+            if self.path == "/api/arch/check":
+                import archnet
+                return self._send(200, archnet.check(json.loads(body or b"{}").get("arch", archnet.DEFAULT), len(cards.meta()["classes"]), runs=10))
+            if self.path == "/api/pretrain": return self._send(200, start_pretrain(json.loads(body or b"{}")))
             if self.path == "/api/external/import":
                 b = json.loads(body or b"{}")
                 if not b.get("accept_licence"): raise ValueError("accept the licence first")

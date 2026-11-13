@@ -59,8 +59,13 @@ def build(n_images, seed=7, log=print):
     return X, Y, M
 
 
-def pretrain(path, n_images, epochs, log=print):
-    torch.set_num_threads(10); torch.manual_seed(0); X, Y, M = build(n_images, log=log); model = K.make("base"); ctc = nn.CTCLoss(blank=C.BLANK_IDX, zero_infinity=True)
+def pretrain(path, n_images, epochs, log=print, arch=None):
+    """arch: an architecture spec (archnet.py) to pretrain instead of the shipped CRNN."""
+    torch.set_num_threads(10); torch.manual_seed(0); X, Y, M = build(n_images, log=log)
+    if arch is None: model = K.make("base")
+    else:
+        import archnet; model = archnet.build(arch, len(C.CLASSES))
+    ctc = nn.CTCLoss(blank=C.BLANK_IDX, zero_infinity=True)
     opt = torch.optim.Adam(model.parameters(), lr=K.PRE_LR); idx = list(range(len(Y))); step = 0
     for ep in range(1, epochs + 1):
         t0 = time.time(); model.train(); random.Random(ep).shuffle(idx); tl = nb = 0

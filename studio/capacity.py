@@ -14,7 +14,7 @@ learning-rate warm-up and gradient clipping to what the original reader used, wh
 What this can and cannot say. It uses the ANC card's 369 labeled cells from few writers; the folds are by page, not by writer. A reader that
 gains here may be fitting those writers. Differences of a few points are inside the noise (see the intervals); `paired` counts the cells one
 reader gets right and the other wrong, with a sign-test p-value. Latency is PyTorch on this machine's CPU, one cell at a time: it is not a
-phone number. The larger readers are not converted to TensorFlow Lite here (tflite_export.py only rebuilds the shipped graph).
+phone number. The larger readers here (BigCRNN, the attention encoder) are not converted to TensorFlow Lite; networks described by archnet.py specs are (tflite_export.py).
 
     python capacity.py run [--quick] [--variants base,big_crnn,attn] [--conds small,large]     results in studio/capacity/ (gitignored)
     python capacity.py report                                                                 print the table from stored results
