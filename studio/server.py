@@ -8,7 +8,7 @@ import cv2
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cardpack"))
 import cardpack as cp
 from detect import detect_layout, load_normalized, match_score
-import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize, labruns, pretrained
+import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize, labruns, pretrained, external, extreader
 from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
@@ -327,6 +327,12 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/cards": return self._send(200, cards.list_cards())
         if p == "/api/jobs": return self._send(200, labruns.jobs())
         if p == "/api/pretrained": return self._send(200, pretrained.list_all())
+        if p == "/api/external": return self._send(200, {"models": external.list_all(), "profiles": {k: v["label"] for k, v in extreader.PROFILES.items()}})
+        if p == "/api/external/hf":
+            repo = parse_qs(urlparse(self.path).query).get("repo", [""])[0]
+            if not re.fullmatch(r"[\w.-]{1,96}/[\w.-]{1,96}", repo): return self._err(400, "repo looks like owner/name")
+            try: return self._send(200, external.hf_info(repo))
+            except ValueError as e: return self._err(400, str(e))
         if p == "/api/scans": return self._send(200, scans.summaries())
         if p == "/api/labelstudio": return self._send(200, labelstudio.status(parse_qs(urlparse(self.path).query).get("card", [None])[0]))
         m = re.fullmatch(r"/api/card/([\w-]{1,40})/writers", p)
@@ -420,6 +426,18 @@ class H(BaseHTTPRequestHandler):
             if self.path == "/api/train/start": return self._send(200, start_training(json.loads(body or b"{}")))
             if self.path.split("?")[0] == "/api/cleanup": return self._cleanup(body, parse_qs(urlparse(self.path).query))
             if self.path == "/api/template/grid": return self._save_grid(json.loads(body))
+            if self.path == "/api/external/import":
+                b = json.loads(body or b"{}")
+                if not b.get("accept_licence"): raise ValueError("accept the licence first")
+                keep = {k: b[k] for k in ("height", "channels", "max_width", "blank", "digit_map") if k in b}
+                return self._send(200, external.hf_import(str(b.get("repo", "")), str(b.get("name", "")), str(b.get("onnx_file", "")), str(b.get("charset_file", "")), str(b.get("profile", "")),
+                                                          True, {"yes": True, "no": False}.get(b.get("commercial")), str(b.get("note", ""))[:300], **keep))
+            m = re.fullmatch(r"/api/external/([\w-]{1,40})/(benchmark|suggest|remove)", self.path.split("?")[0])
+            if m:
+                card = parse_qs(urlparse(self.path).query).get("card", [""])[0]
+                if m[2] == "remove": external.remove(m[1]); return self._send(200, {"removed": m[1]})
+                if not cards.exists(card): raise KeyError("no such card")
+                return self._send(200, external.benchmark(card, m[1]) if m[2] == "benchmark" else external.suggest(card, m[1]))
             if self.path.split("?")[0] == "/api/scans":
                 q = parse_qs(urlparse(self.path).query); card = q.get("card", [scans.AUTO])[0]
                 if card != scans.AUTO and not cards.NAME.match(card): raise ValueError("bad card name")

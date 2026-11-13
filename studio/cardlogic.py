@@ -33,6 +33,12 @@ def date_key(text):
     return d, mo, y
 
 
+def canon(text):
+    """A date in one form, for comparing a read with a label: '22.02.26' and '22/2/2026' both -> '22/2/26'. Anything else comes back stripped."""
+    k = date_key(text)
+    return f"{k[0]}/{k[1]}/{k[2] % 100}" if k else (text or "").strip()
+
+
 def parse_fields(value):
     """'bcg, penta1' or ['bcg', 'penta1'] -> ['bcg', 'penta1']"""
     if isinstance(value, str):
