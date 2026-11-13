@@ -35,6 +35,16 @@ class Spec(unittest.TestCase):
         A.normalize({"conv": [{"out": 32}], "context": [{"out": 64, "k": 5}], "rnn": None})
         with self.assertRaisesRegex(ValueError, "limit"): A.normalize({"conv": [{"out": 512, "k": 7}] * 8, "rnn": {"type": "lstm", "hidden": 512, "layers": 3}})
 
+
+    def test_summary_and_flow_describe_the_journey_for_a_builder(self):
+        r = A.summary("cnn-ctc")
+        self.assertTrue(r["ok"]); self.assertEqual((r["params"], r["time_steps"], r["hash"]), (767169, 48, A.spec_hash("cnn-ctc")))
+        self.assertEqual(r["flow"][0], {"label": "cell (gray)", "shape": [1, 48, 192]}); self.assertEqual(r["flow"][-1]["shape"], [48, 129])
+        self.assertEqual([f["shape"] for f in r["flow"]][1:5], [[32, 24, 96], [64, 12, 48], [128, 6, 48], [128, 1, 48]])
+        self.assertEqual(len(r["flow"]), 1 + 4 + 2 + 1)                       # input, 4 blocks, 2 line convolutions, linear
+        crnn = A.summary("crnn"); self.assertEqual(crnn["flow"][-2], {"label": "1x biLSTM 128", "shape": [48, 256]})
+        bad = A.summary({"conv": []}); self.assertEqual((bad["ok"], "blocks" in bad["problems"][0]), (False, True))
+
     def test_the_default_is_recognised(self):
         self.assertTrue(A.is_default("crnn")); self.assertFalse(A.is_default("crnn-wide")); self.assertTrue(A.is_default(A.PRESETS["crnn"]["spec"]))
 

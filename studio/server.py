@@ -466,6 +466,9 @@ class H(BaseHTTPRequestHandler):
             if self.path == "/api/arch/check":
                 import archnet
                 return self._send(200, archnet.check(json.loads(body or b"{}").get("arch", archnet.DEFAULT), len(cards.meta()["classes"]), runs=10))
+            if self.path == "/api/arch/describe":
+                import archnet
+                return self._send(200, archnet.summary(json.loads(body or b"{}").get("arch", archnet.DEFAULT), len(cards.meta()["classes"])))
             if self.path == "/api/pretrain": return self._send(200, start_pretrain(json.loads(body or b"{}")))
             if self.path == "/api/external/import":
                 b = json.loads(body or b"{}")

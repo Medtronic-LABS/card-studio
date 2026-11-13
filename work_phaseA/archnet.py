@@ -125,6 +125,35 @@ def is_default(spec):
     return normalize(spec) == normalize(DEFAULT)
 
 
+def flow(spec, n_classes=129):
+    """The picture's journey through the network, stage by stage, for a diagram: [{"label", "shape"}]. shape is [channels, height, width] for the convolutions and [time steps, features]
+    after the height has collapsed. Pure Python."""
+    s = normalize(spec); h, w, c = IMG_H, IMG_W, 1
+    out = [{"label": "cell (gray)", "shape": [1, h, w]}]
+    for b in s["conv"]:
+        pool = b["pool"]
+        if pool == "collapse": h = 1; pl = "collapse height"
+        elif pool[0] == "collapse": h, w = 1, w // pool[1]; pl = f"collapse height, width /{pool[1]}"
+        else: h, w = h // pool[0], w // pool[1]; pl = "no pool" if tuple(pool) == (1, 1) else f"pool {pool[0]}x{pool[1]}"
+        c = b["out"]; out.append({"label": f"conv {b['k']}x{b['k']} to {c}, {pl}", "shape": [c, h, w]})
+    for b in s["context"]:
+        c = b["out"]; out.append({"label": f"conv along the line, k {b['k']}, to {c}", "shape": [w, c]})
+    r = s["rnn"]; feat = c
+    if r:
+        feat = r["hidden"] * (2 if r["bidirectional"] else 1)
+        out.append({"label": f"{r['layers']}x {'bi' if r['bidirectional'] else ''}{r['type'].upper()} {r['hidden']}", "shape": [w, feat]})
+    out.append({"label": f"linear to {n_classes} classes", "shape": [w, n_classes]})
+    return out
+
+
+def summary(spec, n_classes=129):
+    """Everything a builder shows while a spec is edited, without torch: {ok, spec, hash, params, time_steps, flow} or {ok: False, problems}."""
+    try: s = normalize(spec)
+    except ValueError as e: return {"ok": False, "problems": [str(e)]}
+    d = describe(s, n_classes)
+    return {"ok": True, "spec": s, "hash": spec_hash(s), "params": d["params"], "time_steps": d["time_steps"], "flow": flow(s, n_classes)}
+
+
 # ---------------------------------------------------------------- the network (needs torch)
 def build(spec, n_classes=129):
     import torch.nn as nn

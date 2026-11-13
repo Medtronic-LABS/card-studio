@@ -20,18 +20,17 @@ class Panel(unittest.TestCase):
         self.assertEqual(d["hp"]["optimizer"]["options"], ["adam", "adamw", "sgd"]); self.assertEqual((d["hp"]["batch"]["min"], d["hp"]["batch"]["max"]), (4, 256))
 
 
-@unittest.skipUnless(torch, "needs torch")
 class Load(unittest.TestCase):
     def test_nothing_set_is_the_shipped_recipe(self):
-        import train as T
-        r = S.load(None); self.assertIsNone(r["arch"]); self.assertEqual(r["config_label"], "light_lr3e-4"); self.assertEqual(r["cfg"], T.resolve_cfg("light_lr3e-4"))
-        self.assertEqual(r["cfg"]["lr"], T.CONFIGS["light_lr3e-4"]["lr"]); self.assertEqual((r["cfg"]["optimizer"], r["cfg"]["batch"], r["cfg"]["balance"]), ("adam", 64, True))
+        import hpspec
+        r = S.load(None); self.assertIsNone(r["arch"]); self.assertEqual(r["config_label"], "light_lr3e-4"); self.assertEqual(r["cfg"], hpspec.resolve("light_lr3e-4"))
+        self.assertEqual(r["cfg"]["lr"], hpspec.PRESETS["light_lr3e-4"]["lr"]); self.assertEqual((r["cfg"]["optimizer"], r["cfg"]["batch"], r["cfg"]["balance"]), ("adam", 64, True))
         self.assertIsNone(S.load({"arch": "crnn"})["arch"])           # naming the shipped network is the shipped network
 
-    def test_presets_in_the_panel_match_the_trainers(self):
-        import train as T
-        for k, v in S.PRESET_VALUES.items():
-            self.assertEqual(T.CONFIGS[k]["lr"], v["lr"], k); self.assertEqual({a: T.CONFIGS[k]["aug"][a] for a in v["aug"]}, v["aug"], k)
+    @unittest.skipUnless(torch, "needs torch")
+    def test_the_trainers_presets_are_the_panels_presets(self):
+        import hpspec, train as T
+        self.assertEqual(T.CONFIGS, hpspec.PRESETS); self.assertEqual(S.describe_all()["presets"], hpspec.PRESETS)
 
     def test_values_and_architecture_are_checked_and_recorded(self):
         r = S.load({"preset": "nbaug_lr1e-4", "hp": {"lr": 5e-4, "schedule": "cosine", "aug": {"erase": 0.3}}, "arch": "gru-crnn"})
