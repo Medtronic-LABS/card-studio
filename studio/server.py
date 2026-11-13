@@ -8,7 +8,7 @@ import cv2
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cardpack"))
 import cardpack as cp
 from detect import detect_layout, load_normalized, match_score
-import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize, labruns, pretrained, external, extreader, settings as train_settings
+import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize, labruns, pretrained, external, extreader, testset, seedexp, settings as train_settings
 from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
@@ -177,6 +177,8 @@ def start_training(req):
     global _proc
     if _proc is not None and _proc.poll() is None:
         raise ValueError("a training run is already in progress")
+    if _seed["proc"] is not None and _seed["proc"].poll() is None:
+        raise ValueError("a seed experiment is running: one heavy job at a time")
     target, min_n, card = float(req.get("target", 85)), int(req.get("min_n", 20)), str(req.get("card", cards.LEGACY))
     if not (50 <= target <= 100) or not (1 <= min_n <= 1000):
         raise ValueError("target must be 50-100 and min_n 1-1000")
@@ -198,6 +200,29 @@ def start_training(req):
         (d / "settings.json").write_text(json.dumps(sett, indent=1)); cmd += ["--settings", str(d / "settings.json")]
     _proc = subprocess.Popen(cmd, stdout=open(d / "log.txt", "w"), stderr=subprocess.STDOUT, cwd=str(HERE))
     return {"run": d.name, "card": card}
+
+
+_seed = {"proc": None}
+
+
+def start_seedexp(card, req):
+    """Run a seed experiment (cross-validation only, N seeds) in the background with the settings of the panel. One heavy job at a time."""
+    if (_proc is not None and _proc.poll() is None) or (_pre["proc"] is not None and _pre["proc"].poll() is None) or (_seed["proc"] is not None and _seed["proc"].poll() is None):
+        raise ValueError("a training, pretraining or seed run is already in progress")
+    if not cards.exists(card): raise ValueError("no such card")
+    name, seeds = str(req.get("name", "")), int(req.get("seeds", 3))
+    sett = req.get("settings") or {}
+    train_settings.load(sett)                                    # raises, saying what is wrong
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", name): raise ValueError("an experiment name is letters, digits, _ and -, at most 32")
+    if not 2 <= seeds <= seedexp.MAX_SEEDS: raise ValueError(f"seeds is 2 to {seedexp.MAX_SEEDS}")
+    if seedexp.exp_dir(card, name).exists(): raise ValueError(f"an experiment called {name} already exists for {card}")
+    max_epochs = int(req.get("max_epochs", 300))
+    if not 5 <= max_epochs <= 1000: raise ValueError("max_epochs must be 5-1000")
+    RUNS.mkdir(exist_ok=True); f = RUNS / f"seedexp-{card}-{name}.settings.json"; f.write_text(json.dumps(sett))
+    cmd = [sys.executable, str(HERE / "seedexp.py"), "run", card, name, "--seeds", str(seeds), "--pretrained", str(req.get("pretrained", "auto")), "--max-epochs", str(max_epochs)]
+    if sett: cmd += ["--settings", str(f)]
+    _seed["proc"] = subprocess.Popen(cmd, stdout=open(RUNS / f"seedexp-{card}-{name}.log", "w"), stderr=subprocess.STDOUT, cwd=str(HERE))
+    return {"name": name, "seeds": seeds}
 
 
 _pre = {"proc": None, "name": None, "log": None}
@@ -376,6 +401,15 @@ class H(BaseHTTPRequestHandler):
         if m:
             if not cards.exists(m[1]): return self._err(404, "no such card")
             w = cards.writers(m[1]); return self._send(200, {**cards.writer_status(m[1]), "by_page": w})
+        m = re.fullmatch(r"/api/card/([\w-]{1,40})/(testset|seedexp|seedexp/compare)", p)
+        if m:
+            if not cards.exists(m[1]): return self._err(404, "no such card")
+            q = parse_qs(urlparse(self.path).query)
+            try:
+                if m[2] == "testset": return self._send(200, testset.status(m[1]))
+                if m[2] == "seedexp": return self._send(200, {"experiments": seedexp.listing(m[1]), **seedexp.tried(m[1])})
+                return self._send(200, seedexp.compare(m[1], q.get("a", [""])[0], q.get("b", [""])[0]))
+            except ValueError as e: return self._err(400, str(e))
         m = re.fullmatch(r"/api/card/([\w-]{1,40})/datasize", p)
         if m:
             try: return self._send(200, datasize.summary(m[1], parse_qs(urlparse(self.path).query).get("target", [None])[0]))
@@ -486,6 +520,13 @@ class H(BaseHTTPRequestHandler):
                 q = parse_qs(urlparse(self.path).query); card = q.get("card", [scans.AUTO])[0]
                 if card != scans.AUTO and not cards.NAME.match(card): raise ValueError("bad card name")
                 return self._send(200, {"results": scans.add(card, body, Path(q.get("name", ["scan"])[0]).name[:120], q.get("writer", [""])[0] or None)})
+            m = re.fullmatch(r"/api/card/([\w-]{1,40})/(testset/reserve|testset/score|seedexp/run)", self.path)
+            if m:
+                if not cards.exists(m[1]): raise KeyError("no such card")
+                b = json.loads(body or b"{}")
+                if m[2] == "testset/reserve": return self._send(200, cards.make_holdout(m[1], float(b.get("fraction", cards.HOLDOUT_FRACTION))))
+                if m[2] == "testset/score": return self._send(200, testset.score(m[1], b.get("run") or None))
+                return self._send(200, start_seedexp(m[1], b))
             m = re.fullmatch(r"/api/card/([\w-]{1,40})/datasize/curve", self.path)
             if m:
                 if not cards.exists(m[1]): raise KeyError("no such card")

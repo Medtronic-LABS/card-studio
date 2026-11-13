@@ -52,7 +52,7 @@ def grammar_spec(card):
 
 
 def cv_job(a):
-    fold, folds, merged, card, max_epochs, gspec, weights, cfg, arch = a
+    fold, folds, merged, card, max_epochs, gspec, weights, cfg, arch, seed = a
     import torch; import common as C, train as T
     torch.set_num_threads(2); C.use_fields(cards.masks(card))
     rows = C.read_labels(merged); pre = torch.load(weights) if weights else None           # no weights: this architecture starts from scratch
@@ -60,7 +60,7 @@ def cv_job(a):
     vp = set(random.Random(1000 + fold).sample(rest, max(4, round(len(rest) / 7))))
     tr = [r for r in rows if r["page"] in rest and r["page"] not in vp]; va = [r for r in rows if r["page"] in vp]; te = [r for r in rows if r["page"] in test_pages]
     assert not ({r["page"] for r in tr + va} & test_pages)
-    m, info = T.finetune(pre, tr, va, cfg if isinstance(cfg, dict) else T.resolve_cfg(cfg), seed=0, max_epochs=max_epochs, log=lambda *_: None, arch=arch)
+    m, info = T.finetune(pre, tr, va, cfg if isinstance(cfg, dict) else T.resolve_cfg(cfg), seed=seed, max_epochs=max_epochs, log=lambda *_: None, arch=arch)
     out = [dict(page=r["page"], row=r["row"], col=r["col"], label=r["label"], pred=p, conf=c) for (p, c), r in zip(T.predict_torch(m, te), te)]
     gi = [i for i, r in enumerate(te) if r["row"] in gspec]          # the same cells read again against the field's grammar, from the same model
     if gi:
@@ -102,6 +102,8 @@ def metrics(recs):
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("run_dir"); ap.add_argument("--target", type=float, default=85.0); ap.add_argument("--min-n", type=int, default=20); ap.add_argument("--config", default=CFG, choices=CONFIG_NAMES, help="training preset: learning rate and augmentation strength")
+    ap.add_argument("--seed", type=int, default=0, help="training seed (the folds do not change with it): run several to see how much a result moves by chance")
+    ap.add_argument("--cv-only", action="store_true", help="stop after cross-validation: write cv_predictions.json and a short results.json, train no final reader and write no pack (what seed experiments use)")
     ap.add_argument("--settings", default=None, help="JSON file: {\"preset\": ..., \"hp\": {every training value}, \"arch\": a preset name or an architecture spec (archnet.py)}; see settings.py")
     ap.add_argument("--card", default=cards.LEGACY); ap.add_argument("--pretrained", default="auto", help="starting weights: auto (studio/pretrained/DEFAULT, else legacy), legacy, or a name from pretrained.py list"); ap.add_argument("--max-epochs", type=int, default=300, help="cap per CV fold (lower only for a quick trial)")
     a = ap.parse_args(); run = Path(a.run_dir); run.mkdir(parents=True, exist_ok=True); t0 = time.time()
@@ -129,7 +131,7 @@ def main():
         status("cv", f"{len(rows)} labeled cells, {len(pages)} pages; 0 of 5 folds done", cv_done=0)
         preds, bests, curves = [], [], []; gspec = grammar_spec(a.card)
         with Pool(5) as pool:
-            for fold, out, best, hist in pool.imap_unordered(cv_job, [(f, folds, str(merged), a.card, a.max_epochs, gspec, str(weights) if weights else None, cfg, arch) for f in range(5)]):
+            for fold, out, best, hist in pool.imap_unordered(cv_job, [(f, folds, str(merged), a.card, a.max_epochs, gspec, str(weights) if weights else None, cfg, arch, a.seed) for f in range(5)]):
                 preds += out; bests.append(best); curves.append({"fold": fold, "best_epoch": best, "history": hist})
                 status("cv", f"{len(bests)} of 5 folds done", cv_done=len(bests))
         assert len(preds) == n_train and len({(p["page"], p["row"], p["col"]) for p in preds}) == n_train
@@ -137,11 +139,16 @@ def main():
         assert len(preds) == len(rows) or layouts, "every labeled cell must have exactly one cross-validation read"
         cv = metrics(preds); overall = metrics([dict(p, row="ALL") for p in preds])["ALL"]
         epochs = int(statistics.median(bests))
+        if a.cv_only:
+            json.dump(preds, open(run / "cv_predictions.json", "w"))
+            json.dump(dict(card=a.card, cv_only=True, seed=a.seed, settings=sett["record"], cv_all=overall, best_epochs=sorted(bests), n_cells=len(rows), n_pages=len(pages), split_unit=unit, minutes=round((time.time() - t0) / 60, 1),
+                           fields=[dict(field=k, **v) for k, v in sorted(cv.items(), key=lambda kv: -kv[1]["n"])]), open(run / "results.json", "w"), indent=1)
+            status("done", "cross-validation only: no final reader and no pack"); return
         status("final", f"training the reader on all {len(pages)} pages for {epochs} epochs (median best epoch of the folds)", cv_done=5)
         import torch, common as C, train as T
         C.use_fields(cards.masks(a.card))
         pre = torch.load(weights) if weights else None
-        model = train_fixed(pre, C.read_labels(merged), epochs, cfg=cfg, arch=arch); model.eval()
+        model = train_fixed(pre, C.read_labels(merged), epochs, seed=a.seed, cfg=cfg, arch=arch); model.eval()
         status("export", "ONNX export and parity check")
         import numpy as np, onnxruntime as ort
         onnx_path = run / "reader.onnx"; torch.set_num_threads(2)

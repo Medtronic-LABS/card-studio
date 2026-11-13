@@ -138,6 +138,52 @@ def checks(card):
     return out
 
 
+HOLDOUT_FRACTION = 0.2
+HOLDOUT_MIN_TRAIN_PAGES = MIN_PAGES
+
+
+def holdout_path(card):
+    return (WORK if card == LEGACY else CARDS / card) / "holdout.json"
+
+
+def holdout(card):
+    """The card's held-out test set, or None: {pages, unit ("writer" or "page"), units, fraction, seed, created, labeled_cells}. Reserved once; no training, tuning or comparison reads these pages."""
+    p = holdout_path(card)
+    try: return json.loads(p.read_text())
+    except (OSError, ValueError): return None
+
+
+def holdout_pages(card):
+    h = holdout(card)
+    return set(h["pages"]) if h else set()
+
+
+def make_holdout(card, fraction=HOLDOUT_FRACTION, seed=20261103):
+    """Reserve a test set: whole writers when every labeled page has a writer code (and there are enough writers), else whole pages, drawn once with a fixed seed. Refused when a set
+    already exists (drawing again after looking would defeat it: delete holdout.json by hand if you really mean to) or when too few pages would be left to train on. -> the record."""
+    import random
+    if holdout(card): raise ValueError("this card already has a test set; drawing a new one after seeing results would make it a tuning set")
+    if not 0.05 <= fraction <= 0.5: raise ValueError("the test set is 5% to 50% of the pages")
+    rows, _ = labels(card)
+    pages = sorted({r["page"] for r in rows})
+    units, unit, n = split_units(card, pages)
+    order = sorted(set(units.values())); k = max(1, round(len(order) * fraction))
+    if len(order) - k < 5: raise ValueError(f"only {len(order)} {unit}s: a test set would leave fewer than 5 to train and cross-validate on")
+    pick = set(random.Random(seed).sample(order, k)); test = sorted(p for p in pages if units[p] in pick)
+    if len(pages) - len(test) < HOLDOUT_MIN_TRAIN_PAGES: raise ValueError(f"a test set of {len(test)} pages would leave {len(pages) - len(test)} to train on (need {HOLDOUT_MIN_TRAIN_PAGES})")
+    rec = {"pages": test, "unit": unit, "units": k, "fraction": fraction, "seed": seed, "created": time.strftime("%Y-%m-%d %H:%M"), "labeled_cells": sum(r["page"] in set(test) for r in rows)}
+    p = holdout_path(card); p.parent.mkdir(parents=True, exist_ok=True); p.write_text(json.dumps(rec, indent=1))
+    return rec
+
+
+def holdout_status(card):
+    """For the panel: {exists, pages, unit, units, cells, train_pages} (the numbers of the test set and of what is left to train on)."""
+    h = holdout(card); held = set(h["pages"]) if h else set()
+    train = {r["page"] for r in labels(card)[0]}; test = {r["page"] for r in labels(card, holdout=True)[0]}
+    return {"exists": bool(h), "created": h and h["created"], "unit": h and h["unit"], "units": h and h["units"], "test_pages": len(test), "test_cells": len(labels(card, holdout=True)[0]),
+            "train_pages": len(train), "train_cells": len(labels(card)[0])}
+
+
 def masks(card):
     """{field key: allowed class indices}: what the trainer and the decoder restrict each field to."""
     m = meta()
@@ -167,10 +213,17 @@ def _imported(card):
             if (r.get("pack") or LEGACY) == pid]
 
 
-def labels(card):
+def labels(card, holdout=False):
     """-> (rows, problems). rows: [{page,row,col,label,crop}], sorted, one per cell, later sources win (labels.csv, labels_new.csv, imports).
     `anc` rows keep crop "" (the trainer reads work/crops) unless the crop was imported. Other cards carry the crop path and are checked:
-    a row whose field is not in the grid, whose crop is missing or whose label has a character the field cannot emit is left out and counted."""
+    a row whose field is not in the grid, whose crop is missing or whose label has a character the field cannot emit is left out and counted.
+    Pages in the card's held-out test set (holdout.json) are NOT returned, so no training, tuning, learning curve or comparison can see them; holdout=True returns only those."""
+    rows, bad = _labels(card)
+    held = holdout_pages(card)
+    return ([r for r in rows if r["page"] in held] if holdout else [r for r in rows if r["page"] not in held]), bad
+
+
+def _labels(card):
     cells = {}
     if card == LEGACY:
         for f in ("labels.csv", "labels_new.csv"):
