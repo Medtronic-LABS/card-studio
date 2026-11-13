@@ -25,6 +25,8 @@ class Decoding(unittest.TestCase):
         for v in VECTORS["vectors"]:
             text, margin = G.decode(np.array(v["logits"]), v["chars"], v["blank"], v["kind"], v["range"], v["years"])
             self.assertEqual(text, v["text"], v["note"]); self.assertAlmostEqual(margin, v["margin"], places=9, msg=v["note"])
+            t2, m2, p2 = G.decode_full(np.array(v["logits"]), v["chars"], v["blank"], v["kind"], v["range"], v["years"])
+            self.assertEqual((t2, round(m2, 9)), (text, round(margin, 9))); self.assertAlmostEqual(p2, v["posterior"], places=9, msg=v["note"])
 
     def test_clear_reads_come_back_as_read_and_broken_ones_are_pulled_to_valid_values(self):
         by = {v["note"]: v for v in VECTORS["vectors"] if v["kind"] == "date"}
@@ -42,6 +44,20 @@ class Decoding(unittest.TestCase):
 
     def test_nothing_writable_gives_nothing(self):
         self.assertEqual(G.decode(np.zeros((6, 2)), ["<blank>", "x"], 0, "bp"), ("", float("-inf")))
+
+
+class Posterior(unittest.TestCase):
+    def test_the_posterior_falls_when_other_strings_are_nearly_as_likely_while_the_margin_stays_at_one(self):
+        import math
+        sure = {"a": 0.0, "b": -12.0, "c": -13.0}; unsure = {"a": 0.0, "b": -0.2, "c": -0.4}
+        self.assertGreater(G.posterior(sure, "a"), 0.99); self.assertLess(G.posterior(unsure, "a"), 0.45)
+        self.assertAlmostEqual(G.posterior({"a": -3.0, "b": -3.0}, "a"), 0.5)
+        self.assertEqual(G.confidence(0.7, 0.3), 1.0); self.assertEqual(G.confidence(0.7, 0.3, "posterior"), 0.3); self.assertAlmostEqual(G.confidence(-0.5, 0.3), math.exp(-0.5)); self.assertEqual(G.confidence(float("-inf"), 0.0), 0.0)
+
+    def test_every_vector_has_a_posterior_in_range_and_noise_gives_a_low_one(self):
+        for v in VECTORS["vectors"]: self.assertTrue(0.0 <= v["posterior"] <= 1.0, v["note"])
+        noise = next(v for v in VECTORS["vectors"] if v["note"] == "noise only"); clear = next(v for v in VECTORS["vectors"] if v["note"] == "clear read" and v["kind"] == "date")
+        self.assertLess(noise["posterior"], 0.5); self.assertGreater(clear["posterior"], noise["posterior"])
 
 
 class TwoLineDate(unittest.TestCase):

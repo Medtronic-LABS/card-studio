@@ -82,6 +82,25 @@ def scores(logp, chars, blank, cands):
     return out
 
 
+def posterior(sc, winner):
+    """The winner's share of the probability of every candidate that can be written with the field's characters: exp(L_winner) / sum over candidates of exp(L_c). {candidate: log-likelihood} in, a number in (0, 1] out."""
+    m = max(sc.values()); return math.exp(sc[winner] - m) / sum(math.exp(v - m) for v in sc.values())
+
+
+def decode_full(logits, chars, blank, kind, rng=None, years=None):
+    """-> (best string, margin, posterior), or ("", -inf, 0.0) when no candidate has any likelihood. Same winner and margin as decode(); posterior is what a pack's field reports as its confidence
+    when it says `grammar_confidence: posterior` (see CARDPACK.md): unlike min(1, exp(margin)), which is 1 for nearly every read, it falls when other strings are nearly as likely."""
+    logp = log_softmax(logits); sc = scores(logp, chars, blank, candidates(kind, rng, years))
+    if not sc: return "", float("-inf"), 0.0
+    best = max(sc, key=sc.get); return best, float(sc[best] - logp.max(1).sum()), float(posterior(sc, best))
+
+
+def confidence(margin, post, kind="margin"):
+    """The confidence a grammar read reports: min(1, exp(margin)) for kind "margin" (packs before the change), the posterior for "posterior"."""
+    if kind == "posterior": return float(post)
+    return min(1.0, math.exp(margin)) if math.isfinite(margin) else 0.0
+
+
 def decode(logits, chars, blank, kind, rng=None, years=None):
     """-> (best string, margin) or ("", -inf) when no candidate has any likelihood. logits [T, K] raw scores over `chars` (one of them the blank, at
     column `blank`); margin = log-likelihood of the winner minus the log-probability of the best single path."""

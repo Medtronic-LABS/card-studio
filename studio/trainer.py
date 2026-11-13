@@ -242,9 +242,9 @@ def main():
         for f in fld["fields"]:
             m = cv.get(f["key"]); g = cv_g.get(f["key"])
             if m and g and g["n"] >= 10 and g["k"] >= m["k"]:       # grammar decoding only where held-out cells show it at least as good as greedy
-                f["decode"] = "grammar"; dec[f["key"]] = dict(decode="grammar", greedy_k=m["k"], grammar_k=g["k"]); m = cv[f["key"]] = g
+                f["decode"] = "grammar"; f["grammar_confidence"] = "posterior"; dec[f["key"]] = dict(decode="grammar", greedy_k=m["k"], grammar_k=g["k"]); m = cv[f["key"]] = g
                 if f["kind"] == "date": f.setdefault("date", {"years": list(constrained.YEARS)})
-            elif m and g: dec[f["key"]] = dict(decode="greedy", greedy_k=m["k"], grammar_k=g["k"]); f.pop("decode", None)
+            elif m and g: dec[f["key"]] = dict(decode="greedy", greedy_k=m["k"], grammar_k=g["k"]); f.pop("decode", None); f.pop("grammar_confidence", None)
             lo_pct = m["lo"] * 100 if m else None
             if m is None: st, why = "needs-review", "no labeled cells for this field"
             elif m["n"] < a.min_n: st, why = "needs-review", f"only {m['n']} held-out cells (need {a.min_n})"

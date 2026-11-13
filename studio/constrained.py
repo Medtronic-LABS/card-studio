@@ -88,6 +88,13 @@ def decode(logits, allowed, kind, rng=None, years=None):
     return grammar.decode(np.asarray(logits)[:, idx], chars, blank, kind, rng, years)
 
 
+def decode_full(logits, allowed, kind, rng=None, years=None):
+    """decode() plus the posterior: -> (best string, margin, posterior)."""
+    import grammar
+    m = cards.meta(); idx = list(allowed); chars = [m["classes"][i] for i in idx]; blank = idx.index(m["blank_idx"])
+    return grammar.decode_full(np.asarray(logits)[:, idx], chars, blank, kind, rng, years)
+
+
 # ---------------------------------------------------------------- experiment
 def fold_job(a):
     """One fold: fine-tune from the given pretrained weights and return the test cells with their logits."""

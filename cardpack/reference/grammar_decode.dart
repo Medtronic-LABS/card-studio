@@ -16,8 +16,16 @@ class GrammarRead {
   /// log-likelihood of [text] minus the log-probability of the single best path. Above 0 is possible (a string sums over alignments).
   /// The confidence a pack reports is min(1, exp(margin)).
   final double margin;
-  const GrammarRead(this.text, this.margin);
+
+  /// exp(L_winner) / sum over candidates of exp(L_c): the winner's share of the probability of every string the field can hold (0 when nothing could be read).
+  final double posterior;
+  const GrammarRead(this.text, this.margin, [this.posterior = 0.0]);
+
+  /// The margin rule, min(1, exp(margin)): the confidence of a pack without `grammar_confidence`.
   double get confidence => margin.isFinite ? math.min(1.0, math.exp(margin)) : 0.0;
+
+  /// The confidence a field reports: [posterior] for kind 'posterior' (the field's `grammar_confidence`), else the margin rule.
+  double confidenceFor(String? kind) => kind == 'posterior' ? posterior : confidence;
 }
 
 final Map<String, List<String>> _cache = {};
@@ -104,6 +112,7 @@ GrammarRead decode(List<List<double>> logits, List<String> chars, int blank, Str
   var prev = '';
   String? best;
   var bestLik = 0.0;
+  final liks = <double>[]; // likelihood of every candidate that has any
   for (final cand in candidates(kind, range: range, years: years)) {
     if (cand.split('').any((ch) => !col.containsKey(ch))) continue;
     var l = 0;
@@ -133,11 +142,20 @@ GrammarRead decode(List<List<double>> logits, List<String> chars, int blank, Str
     }
     prev = cand;
     final lik = bs.last[t - 1] + ns.last[t - 1];
+    if (lik > 0) liks.add(lik);
     if (lik > bestLik) {
       bestLik = lik;
       best = cand;
     }
   }
   if (best == null) return const GrammarRead('', double.negativeInfinity);
-  return GrammarRead(best, math.log(bestLik) - bestPath);
+  // posterior by log-sum-exp over the candidate log-likelihoods, as grammar.py does
+  final ll = [for (final x in liks) math.log(x)];
+  final lw = math.log(bestLik);
+  final m = ll.reduce(math.max);
+  var tot = 0.0;
+  for (final x in ll) {
+    tot += math.exp(x - m);
+  }
+  return GrammarRead(best, lw - bestPath, math.exp(lw - m) / tot);
 }

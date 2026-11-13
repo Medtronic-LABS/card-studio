@@ -1,7 +1,7 @@
 """Golden vectors for ports of grammar decoding (cardpack/grammar.py). `python cardpack/reference/make_vectors.py` writes grammar_vectors.json.
 
 Each vector is made-up reader output (no patient data, no model): T steps of scores over a small set of classes, with the answer cardpack/grammar.py gives.
-A port passes when, for every vector, it returns the same text and a margin within 1e-6 of the one stored. The logits are drawn from a fixed seed, with
+A port passes when, for every vector, it returns the same text and a margin and posterior within 1e-6 of the ones stored. The logits are drawn from a fixed seed, with
 some vectors shaped like a clear read of a known string, so the expected text is not an accident of noise."""
 import json, sys
 from pathlib import Path
@@ -28,10 +28,10 @@ def logits_for(rng, chars, text, T=48):
 def main():
     rng = np.random.default_rng(20261112); out = []
     for kind, rngv, years, text, note in CASES:
-        chars = CHARS[kind]; lg = logits_for(rng, chars, text); best, margin = grammar.decode(lg, chars, 0, kind, rngv, years)
-        out.append({"note": note, "kind": kind, "range": rngv, "years": years, "chars": chars, "blank": 0, "logits": lg.tolist(), "text": best, "margin": margin})
+        chars = CHARS[kind]; lg = logits_for(rng, chars, text); best, margin, post = grammar.decode_full(lg, chars, 0, kind, rngv, years)
+        out.append({"note": note, "kind": kind, "range": rngv, "years": years, "chars": chars, "blank": 0, "logits": lg.tolist(), "text": best, "margin": margin, "posterior": post})
     (HERE / "grammar_vectors.json").write_text(json.dumps({"about": "see make_vectors.py", "tolerance": 1e-6, "vectors": out}))
-    for v in out: print(f"{v['kind']:7s} {v['note']:42s} -> {v['text']!r:12} margin {v['margin']:.3f}")
+    for v in out: print(f"{v['kind']:7s} {v['note']:42s} -> {v['text']!r:12} margin {v['margin']:.3f} posterior {v['posterior']:.4f}")
 
 
 if __name__ == "__main__":

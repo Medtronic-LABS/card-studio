@@ -211,6 +211,7 @@ def validate(path, check_reader=True) -> list:
             if f["kind"] not in ("date", "bp", "number") or (f["kind"] == "number" and f["range"] is None):
                 errs.append(f"{k}: decode grammar needs a date, a bp, or a number with a range")
             if f.get("layout", "single") != "single": errs.append(f"{k}: decode grammar is for one-line fields, not layout {f['layout']}")
+        if f.get("grammar_confidence", "margin") not in ("margin", "posterior"): errs.append(f"{k}: grammar_confidence must be margin or posterior")
         if "date" in f and (f["kind"] != "date" or f["date"]["years"][0] > f["date"]["years"][1]): errs.append(f"{k}: date.years is for a date field and needs first <= last")
         if f["kind"] == "mark":
             vv = f.get("valid_values")
