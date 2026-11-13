@@ -31,7 +31,7 @@ class Checks(unittest.TestCase):
 
 class StackedDate(unittest.TestCase):
     def _pack(self, decode):
-        classes = ["<b>"] + list("0123456789/."); p = mock.Mock(); p.classes = classes; p.blank = 0
+        classes = ["<b>"] + list("0123456789/."); p = mock.Mock(); p.classes = classes; p.blank = 0; p.external = None
         p.spec = {"bcg": {"kind": "date", "layout": "stacked", "decode": decode, "allowed_idx": list(range(len(classes)))}}
         return p
 

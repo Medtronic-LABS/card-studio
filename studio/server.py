@@ -399,6 +399,8 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/idtest":
             f = RUNS / "idtest" / "summary.json"
             return self._send(200, json.loads(f.read_text()) if f.exists() else {"headline": []})
+        if p == "/api/playground/options":
+            return self._send(200, {"cards": cleanup._cards_with_template(), "models": cleanup.model_options()})
         if p == "/api/cleanup/packs":
             return self._send(200, [{"file": pk.path.name, "name": pk.name, "default": pk.default, "has_reference": pk.reference is not None} for pk in cleanup.installed()])
         m = re.fullmatch(r"/api/cleanup/([0-9a-f]{32})/([a-z_]+)\.png", p)
@@ -659,6 +661,11 @@ class H(BaseHTTPRequestHandler):
         """Clean-up lab: align one photo to a pack and read it with every photo clean-up option."""
         want = q.get("pack", ["auto"])[0]
         packs = cleanup.installed(); pack = None
+        if q.get("card"):                                    # the playground: this card's template with the chosen model
+            card = q["card"][0]
+            if not cards.exists(card): raise KeyError("no such card")
+            UPLOADS.mkdir(exist_ok=True); purge_uploads()
+            return self._send(200, cleanup.analyze(load_normalized(data), UPLOADS, pack=cleanup.build_pack(card, q.get("model", ["card"])[0]), packs=packs))
         if want != "auto":
             if not PACKFILE.match(want): raise ValueError("bad pack name")
             pack = next((pk for pk in packs if pk.path.name == want), None)

@@ -6,14 +6,14 @@
    "file": "docs/screenshots/dashboard.png",
    "view": "dashboard",
    "caption": "Dashboard: model registry, getting started, activity, needs attention, field readiness",
-   "sha256": "e40ec0edcee34a0ba4a0d7f50cac22895122d79036c61f876e06a7c66ec56de8",
+   "sha256": "bbc7507f3456760b6d5c38976a4ab398e671e363dac7f471cfe839ac73838530",
    "images_on_page": 0
   },
   {
    "file": "docs/screenshots/model-quality.png",
    "view": "model-quality",
    "caption": "Model quality: per-field errors, calibration, risk-coverage, confusions, flag-policy tuner, provenance",
-   "sha256": "104655a009f88574b5128fb72de1b90695f30b1aab41dc6f3b37d333c126f90a",
+   "sha256": "feba19128342b4a6fe0af265298b84ee9f7ba89a6e08b36b6378405da75fe3f1",
    "images_on_page": 0
   },
   {
@@ -34,7 +34,7 @@
    "file": "docs/screenshots/clean-up-lab.png",
    "view": "clean-up-lab",
    "caption": "Photo clean-up lab (empty state)",
-   "sha256": "07e780635046a74b603f002a4b0faa7c3e2a6b9d2f8075544bdb598a90723f72",
+   "sha256": "1bf3f6e6a50b060a4145fa56dfc173d66a3ab264b20d2640b6ee4b68974d382c",
    "images_on_page": 0
   },
   {

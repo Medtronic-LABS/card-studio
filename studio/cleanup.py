@@ -4,7 +4,7 @@ A port of the app's ANC path (anc_reader.dart: align, normalize, cut cells, remo
 Studio shows is what the phone would do, up to OpenCV/onnxruntime differences nobody has compared. Local only; nothing is saved
 except small preview PNGs in uploads/ (deleted after a day with the other uploads).
 """
-import json, math, sys, time, uuid
+import json, math, re, sys, time, uuid
 from pathlib import Path
 import cv2, numpy as np
 
@@ -21,14 +21,19 @@ _cache = {}
 
 class Pack:
     """Everything the lab needs from a .cardpack, loaded once."""
-    def __init__(self, path):
+    def __init__(self, path, members=None, model=None, label=None):
+        """path: a .cardpack. Or members (the pack members a card's template makes) plus `model`: bytes of an ONNX reader, or an extreader.ExternalReader (another model's
+        own character set, read greedily with no field masks), to pair one card's template with any reader. label names the pairing."""
         import onnxruntime as ort
-        self.path = Path(path); m = cp.read(self.path)
+        self.path = Path(path or label or "playground"); m = members if members is not None else cp.read(self.path); self.external = None
         self.man = json.loads(m["manifest.json"]); self.fields = json.loads(m["fields.json"]); self.grid = json.loads(m["grid.json"])
         self.tpl = cv2.imdecode(np.frombuffer(m["template.png"], np.uint8), cv2.IMREAD_GRAYSCALE)
         self.tpl_feats = _sift(self.tpl)
-        self.session = ort.InferenceSession(m["reader.onnx"], providers=["CPUExecutionProvider"])
-        r = self.man["reader"]; self.in_name, self.out_name = r["input"]["name"], r["output"]["name"]
+        if model is not None and not isinstance(model, (bytes, bytearray)): self.external = model; self.session = None; self.in_name = self.out_name = None
+        else:
+            self.session = ort.InferenceSession(model if model is not None else m["reader.onnx"], providers=["CPUExecutionProvider"])
+            r = self.man["reader"]; self.in_name, self.out_name = (r["input"]["name"], r["output"]["name"]) if model is None else (self.session.get_inputs()[0].name, self.session.get_outputs()[0].name)
+        self.label = label
         pp = self.man["preprocess"]; self.flatten_k = pp["flatten_kernel"]; self.remove_lines = pp["remove_lines"]; self.ink = pp["ink_gate"]
         nz = pp.get("normalize") or {"default": "flatten"}; self.default = nz["default"]
         ref = nz.get("reference"); self.reference = (ref["mean"], ref["std"]) if ref else None
@@ -39,7 +44,7 @@ class Pack:
 
     @property
     def name(self):
-        return f"{self.id} v{self.version}"
+        return self.label or f"{self.id} v{self.version}"
 
 
 def load_pack(path):
@@ -147,6 +152,8 @@ def read_cell(pack, px, field, piece_grammar=None, piece=False):
     """Masked greedy CTC like AncReader.read. Returns (text, confidence). piece_grammar: read this piece against a grammar kind instead of the field's
     own (the top line of a two-line date is a "daymonth"), and falls back to greedy when nothing fits. piece: this is one line of a two-line cell, so the field's
     whole-cell grammar (a complete date or pressure) does not apply to it."""
+    if pack.external is not None:                 # another model's own charset: greedy, no field masks, its own confidence
+        text, conf = pack.external.read(px); return text, float(conf)
     x = ((px.astype(np.float32) / 255.0 - 0.5) / 0.5).reshape(1, 1, 48, 192)
     lg = pack.session.run([pack.out_name], {pack.in_name: x})[0].reshape(-1, len(pack.classes))
     spec = pack.spec[field]
@@ -235,7 +242,7 @@ def analyze(photo, out_dir, pack=None, packs=None, methods=N.METHODS, preview_wi
     warped, covered = warp(photo, H, pack)
     uid = uuid.uuid4().hex; out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
     g = pack.grid; rows, ncol = g["rows"], len(g["col_lines_top"]) - 1
-    results, all_reads = [], {}
+    results, all_reads, pages = [], {}, {}
     for method in methods:
         note = None
         if method == "contrast_match" and pack.reference is None:
@@ -243,7 +250,7 @@ def analyze(photo, out_dir, pack=None, packs=None, methods=N.METHODS, preview_wi
         page, used, reads, stats = run_method(pack, warped, covered, method)
         s = preview_width / page.shape[1]
         cv2.imwrite(str(out_dir / f"{uid}_{method}.png"), cv2.resize(page, None, fx=s, fy=s, interpolation=cv2.INTER_AREA))
-        all_reads[method] = reads
+        all_reads[method] = reads; pages[method] = page
         results.append({"method": method, "label": N.LABELS[method], "available": True, "image": f"/api/cleanup/{uid}/{method}.png", "is_pack_default": method == pack.default, "checks": card_checks(pack, reads), **stats})
     done = [r["method"] for r in results if r["available"]]
     diff = []
@@ -253,7 +260,72 @@ def analyze(photo, out_dir, pack=None, packs=None, methods=N.METHODS, preview_wi
             texts = {v[0] for v in vals.values()}
             if len(texts) > 1:
                 diff.append({"field": g["cols"][c] if g.get("axis") == "columns" else rows[ri], "visit": (ri if g.get("axis") == "columns" else c) + 1, "reads": {m: {"text": v[0], "confidence": round(v[1], 2), "flagged": v[2]} for m, v in vals.items()}})
-    return {"id": uid, "pack": pack.name, "pack_default": pack.default, "inliers": inl, "covered_percent": round(100.0 * float((covered != 0).mean()), 1),
+    primary = pack.default if pack.default in pages else (next(iter(pages)) if pages else None); cells = []
+    if primary:
+        import base64
+        for ri, c, field, crop in cut_cells(pages[primary], pack, primary):
+            text, conf, flagged = all_reads[primary][(ri, c)]; visit = (ri if g.get("axis") == "columns" else c) + 1
+            if not text and conf == 0.0: continue                                        # no ink: nothing to show
+            px = prepare(remove_lines(crop) if pack.remove_lines else crop, pack); thumb = ""
+            if px is not None: thumb = "data:image/png;base64," + base64.b64encode(cv2.imencode(".png", px)[1].tobytes()).decode()
+            cells.append({"field": field, "visit": visit, "text": text, "confidence": round(conf, 3), "flagged": bool(flagged), "kind": pack.spec[field].get("kind"), "decode": pack.spec[field].get("decode", "greedy"),
+                          "confidence_kind": pack.spec[field].get("grammar_confidence", "margin") if pack.spec[field].get("decode") == "grammar" else "greedy", "image": thumb})
+    return {"cells": cells, "id": uid, "pack": pack.name, "pack_default": pack.default, "inliers": inl, "covered_percent": round(100.0 * float((covered != 0).mean()), 1),
             "methods": results, "disagreements": diff, "cells_total": len(rows) * ncol,
             "notes": ["No ground truth for an uploaded photo: compare the reads with the card by eye.",
                       "Reads use the chosen pack's reader; the app runs the same steps but this port has not been compared with it pixel for pixel."]}
+
+
+# ---------------------------------------------------------------- playground: any card with any model
+def _cards_with_template():
+    out = []
+    for c in cards.list_cards():
+        if c["id"] == cards.LEGACY or c.get("grid"): out.append({"id": c["id"], "pack_versions": c["pack_versions"], "grid": c.get("grid")})
+    return out
+
+
+def model_options():
+    """Readers a card can be paired with. kind pack: the reader inside an installed pack; run: the final reader of a training run; external: a registered outside model
+    (its own characters, read greedily). Pack and run readers share Studio's class list, so any of them runs on any card; the card's field masks and grammars then apply."""
+    out = [{"id": "card", "label": "The card's own newest pack", "kind": "own"}]
+    for p in sorted(PACKS.glob("*.cardpack")):
+        try: man = json.loads(cp.read(p)["manifest.json"])
+        except Exception: continue
+        out.append({"id": f"pack:{p.name}", "label": f"pack {man['id']} v{man['version']}", "kind": "pack"})
+    for d in sorted((HERE / "runs").glob("run-*"), reverse=True):
+        try: res = json.loads((d / "results.json").read_text())
+        except (OSError, ValueError): continue
+        if (d / "reader.onnx").exists(): out.append({"id": f"run:{d.name}", "label": f"run {d.name[4:]} ({res.get('card') or cards.LEGACY})", "kind": "run"})
+    try:
+        import external
+        for m in external.list_all():
+            if m["ok"]: out.append({"id": f"external:{m['name']}", "label": f"outside: {m['name']} ({m['licence'] or 'licence ?'})", "kind": "external"})
+    except Exception: pass
+    return out
+
+
+def build_pack(card, model="card"):
+    """A Pack made of `card`'s template, grid and field rules and the chosen reader. The card's newest pack supplies the rules when it has one (its decoding, thresholds, reference
+    statistics); a card with no pack yet gets rules from its template. -> Pack"""
+    if not cards.exists(card): raise KeyError("no such card")
+    own = sorted((p for p in PACKS.glob(f"{cards.pack_id(card)}_v*.cardpack")), key=lambda p: int(p.stem.rsplit("_v", 1)[1]))
+    members = cp.read(own[-1]) if own else cards.base_members(card)
+    members = dict(members); label = None; reader_model = None
+    if model in ("card", "", None):
+        if not own: raise ValueError(f"{card} has no trained pack yet: pick a model to pair with its template")
+        label = f"{card} + its own model (v{own[-1].stem.rsplit('_v', 1)[1]})"
+    else:
+        kind, _, name = model.partition(":")
+        if kind == "pack":
+            if not re.fullmatch(r"[\w.-]+\.cardpack", name) or not (PACKS / name).exists(): raise KeyError("no such pack")
+            reader_model = cp.read(PACKS / name)["reader.onnx"]; label = f"{card} + {name[:-9]}"
+        elif kind == "run":
+            if not re.fullmatch(r"run-[0-9-]+", name) or not (HERE / "runs" / name / "reader.onnx").exists(): raise KeyError("no such run")
+            reader_model = (HERE / "runs" / name / "reader.onnx").read_bytes(); label = f"{card} + {name}"
+        elif kind == "external":
+            import external
+            reader_model = external.reader(name); label = f"{card} + outside {name}"
+        else: raise ValueError("model must be card, pack:FILE, run:NAME or external:NAME")
+    if reader_model is None: reader_model = members.get("reader.onnx") or None
+    if not reader_model: raise ValueError("this pairing has no reader")
+    return Pack(None, members=members, model=reader_model, label=label)

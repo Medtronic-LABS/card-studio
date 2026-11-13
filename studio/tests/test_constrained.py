@@ -75,7 +75,7 @@ class PackAndLab(unittest.TestCase):
     def test_the_lab_reads_a_grammar_field_through_the_grammar(self):
         import cleanup
         class P:
-            classes, blank = CL, BL; in_name, out_name = "image", "logits"
+            classes, blank = CL, BL; in_name, out_name = "image", "logits"; external = None
             spec = {"d": {"allowed_idx": ALLOWED, "kind": "date", "range": None, "decode": "grammar", "date": {"years": [24, 27]}}, "g": {"allowed_idx": ALLOWED, "kind": "date", "range": None}}
             class session:
                 @staticmethod

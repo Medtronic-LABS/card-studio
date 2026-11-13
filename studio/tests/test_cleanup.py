@@ -128,3 +128,24 @@ class Endpoint(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Playground(unittest.TestCase):
+    """Any card with any model: the options list and the refusals (a bad name never reaches a file path)."""
+    def setUp(self):
+        import cleanup; self.c = cleanup
+
+    def test_options_always_offer_the_cards_own_model_first(self):
+        o = self.c.model_options(); self.assertEqual(o[0]["id"], "card"); self.assertTrue(all({"id", "label", "kind"} <= set(m) for m in o))
+
+    def test_bad_names_are_refused(self):
+        for bad in ("pack:../../etc/passwd", "pack:nope.cardpack", "run:../x", "run:run-0", "external:", "zip:x", "whatever"):
+            with self.assertRaises((KeyError, ValueError), msg=bad): self.c.build_pack("anc", bad)
+        with self.assertRaises(KeyError): self.c.build_pack("no_such_card", "card")
+
+    @unittest.skipUnless((PACKS / "anc_v5.cardpack").exists() and (PACKS / "anc_v3.cardpack").exists(), "needs two installed packs")
+    def test_a_pack_reader_pairs_with_the_cards_template(self):
+        try: import onnxruntime  # noqa: F401
+        except ImportError: self.skipTest("needs onnxruntime")
+        pk = self.c.build_pack("anc", "pack:anc_v3.cardpack"); own = self.c.build_pack("anc", "card")
+        self.assertIn("anc_v3", pk.name); self.assertEqual(pk.classes, own.classes); self.assertIsNone(pk.external)

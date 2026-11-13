@@ -131,6 +131,9 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}.side input,.
  <div class="view hide" id="v-lab">
   <div class="card"><h2>Try the photo clean-up options on one photo</h2>
    <div class="tag">Upload a card photo. It is aligned to a card pack, cleaned up each way the app offers, and read with the pack's reader. Nothing is sent anywhere; previews are deleted after a day. There is no ground truth for an uploaded photo, so judge the reads against the card.</div>
+   <div class="row"><label>Card <select id="pgcard"><option value="">Detect the card (installed packs)</option></select></label>
+    <label>Model <select id="lmodel"></select></label></div>
+   <div class="tag" id="lhelp">Pick a card (its template and grid align and cut your photo) and any model to read it with. A pack or run reader uses the card's field rules and grammars; an outside model reads greedily in its own characters. A model made for another card can read poorly: that is what this shows.</div>
    <div class="row"><label>Card pack <select id="lpack"><option value="auto">Best match (newest on ties)</option></select></label></div>
    <div class="drop" id="ldrop">Drop a card photo here or <button class="btn" onclick="lfile.click()">Browse</button><input id="lfile" type="file" accept="image/*,.pdf,.heic" class="hide"></div></div>
   <div id="lres"></div>
@@ -754,10 +757,14 @@ async function runDetail(n){const rs=await api('/api/runs'),r=rs.find(x=>x.name=
 async function runLog(n){const o=$('rlog'),l=await api(`/api/run/${n}/log`);o.innerHTML=l.found?`${l.cut?`<div class="tag">Showing the last ${l.text.length} of ${l.bytes} bytes. <a href="/api/run/${n}/download/log.txt" download>Download all</a></div>`:`<a href="/api/run/${n}/download/log.txt" download>Download</a>`}<pre style="max-height:360px;overflow:auto;margin-top:6px;font-size:11px">${esc(l.text)}</pre>`:'This run has no log file.'}
 
 let LABBOUND=false;
-async function labInit(){try{const p=await api('/api/cleanup/packs'),sel=$('lpack'),cur=sel.value;sel.innerHTML='<option value="auto">Best match (newest on ties)</option>'+p.map(x=>`<option value="${esc(x.file)}">${esc(x.name)} · default: ${esc(x.default)}${x.has_reference?'':' · no contrast reference'}</option>`).join('');sel.value=[...sel.options].some(o=>o.value===cur)?cur:'auto'}catch(e){}
+async function labInit(){try{const o=await api('/api/playground/options'),cs=$('pgcard'),ms=$('lmodel'),cc=cs.value,cm=ms.value;
+  cs.innerHTML='<option value="">Detect the card (installed packs)</option>'+o.cards.map(c=>`<option value="${esc(c.id)}">${esc(c.id)}${c.pack_versions.length?'':' · no model yet'}</option>`).join('');cs.value=[...cs.options].some(x=>x.value===cc)?cc:'';
+  ms.innerHTML=o.models.map(m=>`<option value="${esc(m.id)}">${esc(m.label)}</option>`).join('');ms.value=[...ms.options].some(x=>x.value===cm)?cm:'card';
+  const sync=()=>{const on=!!cs.value;ms.disabled=!on;$('lpack').closest('label').style.display=on?'none':''};cs.onchange=sync;sync()}catch(e){$('lhelp').textContent='Could not load the card and model lists: '+e.message;window.__lerr=e.stack}
+ try{const p=await api('/api/cleanup/packs'),sel=$('lpack'),cur=sel.value;sel.innerHTML='<option value="auto">Best match (newest on ties)</option>'+p.map(x=>`<option value="${esc(x.file)}">${esc(x.name)} · default: ${esc(x.default)}${x.has_reference?'':' · no contrast reference'}</option>`).join('');sel.value=[...sel.options].some(o=>o.value===cur)?cur:'auto'}catch(e){}
  if(!LABBOUND){LABBOUND=true;const z=$('ldrop');['dragover','dragenter'].forEach(e=>z.addEventListener(e,x=>{x.preventDefault();z.classList.add('over')}));['dragleave','drop'].forEach(e=>z.addEventListener(e,x=>{x.preventDefault();z.classList.remove('over')}));z.addEventListener('drop',e=>labRun(e.dataTransfer.files[0]));$('lfile').onchange=e=>{labRun(e.target.files[0]);e.target.value=''}}}
 async function labRun(f){if(!f)return;const o=$('lres');o.innerHTML='<div class="msg">Aligning and reading with every option…</div>';
- try{const r=await api('/api/cleanup?pack='+encodeURIComponent($('lpack').value),{method:'POST',body:f});labShow(r)}catch(e){o.innerHTML=`<div class="msg bad">${esc(e.message)}</div>`}}
+ try{const card=$('pgcard').value,url=card?'/api/cleanup?card='+encodeURIComponent(card)+'&model='+encodeURIComponent($('lmodel').value):'/api/cleanup?pack='+encodeURIComponent($('lpack').value);const r=await api(url,{method:'POST',body:f});labShow(r)}catch(e){o.innerHTML=`<div class="msg bad">${esc(e.message)}</div>`}}
 function labShow(r){const ok=r.methods.filter(m=>m.available),name=m=>m.label;
  const cards=r.methods.map(m=>m.available?`<div class="card" style="margin:0"><a href="${m.image}" target="_blank" rel="noopener"><img src="${m.image}" alt="${esc(m.label)}" style="width:100%;border:1px solid var(--line);border-radius:6px"></a>
    <div style="margin-top:8px"><b>${esc(m.label)}</b> ${m.is_pack_default?'<span class="badge bg-blue-lt">pack default</span>':''}</div>
@@ -768,6 +775,8 @@ function labShow(r){const ok=r.methods.filter(m=>m.available),name=m=>m.label;
  $('lres').innerHTML=`<div class="card"><h2>${esc(r.pack)} · ${r.inliers} inliers · photo covers ${r.covered_percent}% of the card</h2>
   <div class="tag">Pack default clean-up: ${esc(r.pack_default)}. Amber = flagged for review (confidence below the field's minimum).</div>
   <div class="charts" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">${cards}</div></div>
+  <div class="card"><h2>Every cell read (${(r.cells||[]).length} with ink)</h2>
+  ${(r.cells||[]).length?`<div class="tag">Amber = below the field's minimum confidence. Confidence is the posterior, the margin or the greedy minimum, as the field says.</div><table class="table table-vcenter"><tr><th>Field</th><th>Visit</th><th>Cell</th><th>Read</th><th>Confidence</th><th>Decode</th></tr>${r.cells.map(c=>`<tr class="${c.flagged?'warn':''}"><td>${esc(c.field)}</td><td>${c.visit}</td><td>${c.image?`<img src="${c.image}" style="height:30px;border:1px solid var(--line)">`:''}</td><td><b>${c.text?esc(c.text):'(blank)'}</b></td><td>${c.confidence}</td><td class="tag">${esc(c.decode)}${c.decode==='grammar'?' · '+esc(c.confidence_kind):''}</td></tr>`).join('')}</table>`:'<div class="tag">No cell had ink.</div>'}</div>
   <div class="card"><h2>Cells where the options disagree (${r.disagreements.length} of ${r.cells_total})</h2>
   ${r.disagreements.length?`<table class="table table-vcenter"><tr><th>Field</th><th>Visit</th>${ok.map(m=>`<th>${esc(m.label)}</th>`).join('')}</tr>${rows}</table>${r.disagreements.length>80?'<div class="tag">First 80 shown.</div>':''}`:'<div class="tag">Every option read every cell the same.</div>'}
   <ul class="tag" style="padding-left:18px;margin-top:10px">${r.notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul></div>`}
