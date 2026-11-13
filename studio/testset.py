@@ -41,8 +41,6 @@ def newest_run(card):
 def score(card, run=None):
     """-> {run, n, exact, lo, hi, cer, by_field, looks, warning}. Reads the held-out cells with the run's ONNX reader, the same masked decoding (and field grammars) the pack uses, scores
     whole cells, and appends the look to the log."""
-    import numpy as np, onnxruntime as ort
-    import common as C, constrained, subcells, trainer
     h = cards.holdout(card)
     if not h: raise ValueError("this card has no test set: reserve one first")
     run = run or newest_run(card)
@@ -55,6 +53,8 @@ def score(card, run=None):
     if seen: raise ValueError(f"{run} was trained on {len(seen)} page(s) of the test set (it started before the test set was reserved): train again, then score")
     rows, _ = cards.labels(card, holdout=True)
     if not rows: raise ValueError("the test set has no labeled cells")
+    import numpy as np, onnxruntime as ort                         # heavy imports only once the checks above have passed
+    import common as C, constrained, subcells, trainer
     C.use_fields(cards.masks(card)); masks = cards.masks(card); gram = trainer.grammar_spec(card); decode = {k: v.get("decode") for k, v in res.get("decode", {}).items()}
     pieces, layouts = subcells.expand(card, rows)
     sess = ort.InferenceSession(str(onnx), providers=["CPUExecutionProvider"]); preds = []
