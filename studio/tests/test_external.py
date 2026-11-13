@@ -12,6 +12,7 @@ from test_extreader import tiny_onnx
 CHARS = list("0123456789/.")
 
 
+@unittest.skipUnless(all(__import__("importlib").util.find_spec(m) for m in ("onnx", "onnxruntime")), "needs the onnx and onnxruntime packages to build and run a test model")
 class Registry(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)

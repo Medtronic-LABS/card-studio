@@ -34,9 +34,10 @@ class Spec(unittest.TestCase):
     def test_bad_input_is_refused(self):
         for bad in (lambda: X.make_spec("nope", CHARS), lambda: X.make_spec("paddle-rec", [])): self.assertRaises(ValueError, bad)
 
+    @unittest.skipUnless(__import__("importlib").util.find_spec("yaml"), "needs PyYAML")
     def test_charset_files(self):
         self.assertEqual(X.parse_charset('["a", "b"]'), ["a", "b"]); self.assertEqual(X.parse_charset("a\nb\n"), ["a", "b"])
-        self.assertEqual(X.parse_charset("PostProcess:\n  name: CTCLabelDecode\n  character_dict:\n  - '0'\n  - '1'\n"[:0] + "Global: {}\nPostProcess:\n  character_dict:\n  - '0'\n  - '1'\n  - c\n".replace("Global", "character_dict:\nGlobal", 0)), ["0", "1", "c"])
+        self.assertEqual(X.parse_charset("PostProcess:\n  name: CTCLabelDecode\n  character_dict:\n  - '0'\n  - '1'\n  - c\n"), ["0", "1", "c"])
         with self.assertRaises(ValueError): X.parse_charset('[1, 2]')
 
 
@@ -67,6 +68,7 @@ class Decode(unittest.TestCase):
         self.assertEqual(X.decode(out, s)[0], "23")
 
 
+@unittest.skipUnless(all(__import__("importlib").util.find_spec(m) for m in ("onnx", "onnxruntime")), "needs the onnx and onnxruntime packages to build and run a test model")
 class Reader(unittest.TestCase):
     def test_a_model_runs_end_to_end_and_a_wrong_spec_is_caught(self):
         s = X.make_spec("paddle-rec", CHARS); r = X.ExternalReader(tiny_onnx(s["classes"], "22/3/26"), s)
