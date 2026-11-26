@@ -2,6 +2,7 @@
 work/
 data/
 studio/runs/
+htr/train/runs/
 studio/uploads/
 studio/templates/
 studio/cards/

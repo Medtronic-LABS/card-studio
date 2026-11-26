@@ -463,6 +463,9 @@ class H(BaseHTTPRequestHandler):
                 except ValueError as e:
                     out.append({"name": name, "ok": False, "error": str(e)})
             return self._send(200, {"architectures": out})
+        if p == "/api/runs/table":
+            import htr.train.runs as runs
+            return self._send(200, {"rows": runs.scan()})
         if p == "/api/pretrain/status": return self._send(200, pretrain_status())
         if p == "/api/external": return self._send(200, {"models": external.list_all(), "profiles": {k: v["label"] for k, v in extreader.PROFILES.items()}})
         if p == "/api/external/hf":

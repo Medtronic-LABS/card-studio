@@ -1,6 +1,17 @@
 /* Model quality tab: per-card-type evaluation, calibration, risk-coverage, confusions, the decision-threshold tuner. */
 const f2=v=>v==null?'-':(v*100).toFixed(1)+'%',f0=v=>v==null?'-':(v*100).toFixed(0)+'%';
 let MLX={o:null,sel:null};
+const RT={rows:[],sort:'name',dir:1};
+async function loadRunsTable(){const el=$('runstable');if(!el)return;try{const r=await api('/api/runs/table');RT.rows=r.rows;rtRender()}catch(e){el.innerHTML=`<span class="bad">${esc(e.message)}</span>`}}
+function rtSort(col){RT.dir=RT.sort===col?-RT.dir:1;RT.sort=col;rtRender()}
+function rtRender(){const el=$('runstable');if(!el)return;
+ if(!RT.rows.length){el.innerHTML='No line-dataset runs yet. <code>htr.train.runs.write_result(...)</code> writes one after <code>htr.train.loop.train()</code> finishes.';return}
+ const cols=[['name','Run'],['arch_name','Architecture'],['best_epoch','Best epoch'],['exact','Exact'],['cer_grapheme','CER (grapheme)'],['wer','WER'],['n_params','Parameters'],['model_size_bytes','Size'],['created','Created']],
+  val=(r,c)=>c==='exact'||c==='cer_grapheme'||c==='wer'?(r.ok?r.metrics[c]:null):r[c],
+  rows=RT.rows.slice().sort((a,b)=>{const av=val(a,RT.sort),bv=val(b,RT.sort);if(av==null)return 1;if(bv==null)return -1;return av<bv?-1*RT.dir:av>bv?RT.dir:0});
+ el.innerHTML=`<table class="table table-vcenter"><tr>${cols.map(([c,l])=>`<th style="cursor:pointer" onclick="rtSort('${c}')">${l}${RT.sort===c?(RT.dir>0?' &uarr;':' &darr;'):''}</th>`).join('')}</tr>${rows.map(r=>
+  r.ok?`<tr><td>${esc(r.name)}</td><td>${esc(r.arch_name)}</td><td>${r.best_epoch}</td><td>${f0(r.metrics.exact)}</td><td>${f2(r.metrics.cer_grapheme)}</td><td>${f2(r.metrics.wer)}</td><td>${r.n_params.toLocaleString()}</td><td>${r.model_size_bytes?(r.model_size_bytes/1e6).toFixed(1)+' MB':'-'}</td><td>${esc(r.created)}</td></tr>`
+  :`<tr><td>${esc(r.name)}</td><td colspan="8" class="bad">broken: ${esc(r.problem)}</td></tr>`).join('')}</table>`}
 async function loadMLHome(){try{const o=await api('/api/ml/overview');MLX.o=o;
   const keys=[...o.card_types.map(c=>'ct:'+c.id),...o.templates.map(t=>'tpl:'+t.name)];
   if(!keys.includes(MLX.sel))MLX.sel=(o.card_types.find(c=>c.runs.length)?'ct:'+o.card_types.find(c=>c.runs.length).id:keys[0]);
