@@ -9,7 +9,7 @@ The only PNGs allowed are UI screenshots listed in docs/screenshots/MANIFEST.jso
 import fnmatch, hashlib, json, re, sys
 from pathlib import Path
 
-TEXT_EXT = {".py", ".md", ".html", ".css", ".txt", ".yml", ".yaml", ".toml", ".cfg", ".dart"}
+TEXT_EXT = {".py", ".md", ".html", ".css", ".js", ".txt", ".yml", ".yaml", ".toml", ".cfg", ".dart"}
 NAMES_OK = {".gitignore", "LICENSE", "NOTICE", "requirements.txt"}
 JSON_OK = ["cardpack/schema/*.json", "cardpack/reference/grammar_vectors.json", "model_meta.json", "docs/screenshots/MANIFEST.json", "docs/status.json"]
 DENY_EXT = {".onnx", ".tflite", ".pt", ".pth", ".ckpt", ".cardpack", ".csv", ".tsv", ".pdf", ".ipynb", ".npy", ".npz", ".h5", ".hdf5", ".zip", ".gz", ".tar", ".jpg", ".jpeg",

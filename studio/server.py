@@ -393,6 +393,9 @@ class H(BaseHTTPRequestHandler):
         if p == "/": return self._send(200, (HERE / "static" / "index.html").read_bytes(), "text/html; charset=utf-8")
         if p in VENDOR:
             return self._send(200, (HERE / "static" / p[1:]).read_bytes(), "text/css" if p.endswith(".css") else "text/plain")
+        if p.startswith("/js/") and p.endswith(".js") and NAME.match(p[4:-3]):
+            f = HERE / "static" / "js" / p[4:]
+            if f.exists(): return self._send(200, f.read_bytes(), "text/javascript")
         if p == "/idtest":
             f = RUNS / "idtest" / "report.html"
             if not f.exists(): return self._err(404, "no identification report yet: run python idtest.py build/score/report")
