@@ -1,12 +1,13 @@
-"""Every network family archnet can build converts to TFLite and matches ONNX. Needs torch (to export the ONNX files) and studio/.venv-tflite
+"""Every network family htr.build can build converts to TFLite and matches ONNX. Needs torch (to export the ONNX files) and studio/.venv-tflite
 (TensorFlow, to convert); skipped when either is missing. Run: python -m unittest discover -s tests -p "test_tflite_families.py" """
 import json, subprocess, sys, tempfile, unittest
 from pathlib import Path
 HERE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE)); sys.path.insert(0, str(HERE.parent / "work_phaseA"))
 import tflite_export as T
+sys.path.insert(0, str(HERE.parent))
 try:
-    import torch, archnet; HAVE_TORCH = True
+    import torch, htr; HAVE_TORCH = True
 except Exception: HAVE_TORCH = False
 
 B = lambda out, k=3, pool=None: {"out": out, "k": k, **({"pool": pool} if pool is not None else {})}
@@ -30,7 +31,7 @@ CUSTOM = {
 
 def export_onnx(spec, path):
     import numpy as np
-    torch.manual_seed(0); net = archnet.build(spec); net.eval()
+    torch.manual_seed(0); net = htr.build(spec); net.eval()
     with torch.no_grad():
         for m in net.modules():
             if isinstance(m, torch.nn.BatchNorm2d):
@@ -65,15 +66,15 @@ class Families(unittest.TestCase):
         self.assertTrue((self.dir / f"{name}.tflite").exists())
 
     def test_every_preset(self):
-        for name in archnet.PRESETS: self.check("preset-" + name, name)
+        for name in htr.PRESETS: self.check("preset-" + name, name)
 
     def test_custom_specs(self):
         for name, spec in CUSTOM.items():
             with self.subTest(name): self.check(name, spec)
 
     def test_support_flag_agrees(self):
-        for name in list(archnet.PRESETS) + list(CUSTOM):
-            s = archnet.normalize(CUSTOM.get(name, name)); self.assertTrue(archnet.tflite_support(s)["supported"], name)
+        for name in list(htr.PRESETS) + list(CUSTOM):
+            s = htr.normalize(CUSTOM.get(name, name)); self.assertTrue(htr.tflite_support(s)["supported"], name)
 
     def test_unsupported_graph_is_refused(self):
         import onnx

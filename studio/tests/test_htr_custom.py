@@ -98,30 +98,30 @@ class SpecEngine(unittest.TestCase):
 
 
 @unittest.skipIf(torch is None, "torch not installed")
-class ArchnetShimDispatch(unittest.TestCase):
-    """work_phaseA/archnet.py's _engine() must route a {"custom": name} config here, not to htr.spec/htr.presets."""
+class HtrTopLevelDispatch(unittest.TestCase):
+    """htr/__init__.py's _engine() (the direct successor to work_phaseA/archnet.py, now deleted) must route a {"custom": name}
+    config here, not to htr.spec/htr.presets."""
     def setUp(self):
-        sys.path.insert(0, str(ROOT / "work_phaseA"))
-        import archnet
-        self.archnet = archnet
+        import htr
+        self.htr = htr
 
     def test_normalize_describe_hash_is_default_all_dispatch_to_custom(self):
-        A, cfg = self.archnet, {"custom": "example_tiny"}
-        self.assertEqual(A.normalize(cfg), cfg)
-        self.assertEqual(A.describe(cfg, 40)["params"], C.describe(cfg, 40)["params"])
-        self.assertEqual(A.spec_hash(cfg), C.spec_hash(cfg))
-        self.assertFalse(A.is_default(cfg))
+        H, cfg = self.htr, {"custom": "example_tiny"}
+        self.assertEqual(H.normalize(cfg), cfg)
+        self.assertEqual(H.describe(cfg, 40)["params"], C.describe(cfg, 40)["params"])
+        self.assertEqual(H.spec_hash(cfg), C.spec_hash(cfg))
+        self.assertFalse(H.is_default(cfg))
 
     def test_tflite_support_refused_for_custom(self):
-        self.assertFalse(self.archnet.tflite_support({"custom": "example_tiny"})["supported"])
+        self.assertFalse(self.htr.tflite_support({"custom": "example_tiny"})["supported"])
 
     def test_build_wraps_to_bare_logits_same_as_other_engines(self):
-        net = self.archnet.build({"custom": "example_tiny"}, 40).eval()
+        net = self.htr.build({"custom": "example_tiny"}, 40).eval()
         with torch.no_grad(): y = net(torch.zeros(2, 1, 48, 192))
         self.assertEqual(tuple(y.shape), (48, 2, 40))   # bare tensor, not a (logits, lengths) tuple
 
     def test_check_succeeds_and_reports_tflite_unsupported(self):
-        r = self.archnet.check({"custom": "example_tiny"}, 40, runs=2)
+        r = self.htr.check({"custom": "example_tiny"}, 40, runs=2)
         self.assertTrue(r["ok"], r.get("problems"))
         self.assertFalse(r["tflite"]["supported"])
         self.assertFalse(r["shipped_weights_fit"])

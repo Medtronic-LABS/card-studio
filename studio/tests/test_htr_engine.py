@@ -1,10 +1,13 @@
-"""The reader's architecture as a spec: validation, presets, parameter counts, and (with torch) that the default spec IS the shipped CRNN."""
+"""The reader's architecture as a spec, through htr/__init__.py's top-level dispatch (htr.normalize/describe/spec_hash/is_default/
+flow/summary/build/check): validation, presets, parameter counts, and (with torch) that the default spec IS the shipped CRNN. This
+file used to exercise work_phaseA/archnet.py, now deleted - htr is its direct successor, same behavior."""
 import sys, unittest
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE.parent / "work_phaseA"))
-import archnet as A
+sys.path.insert(0, str(HERE.parent))
+import htr as A
 
 try: import torch  # noqa: F401
 except ImportError: torch = None

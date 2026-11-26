@@ -24,7 +24,7 @@ from pathlib import Path
 import cv2, numpy as np, torch, torch.nn as nn, torch.nn.functional as F
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent / "work_phaseA")); sys.path.insert(0, str(HERE.parent / "cardpack")); sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent / "work_phaseA")); sys.path.insert(0, str(HERE.parent / "cardpack")); sys.path.insert(0, str(HERE)); sys.path.insert(0, str(HERE.parent))
 import common as C
 import capacity as K
 import cards, subcells, synthgen as G
@@ -60,11 +60,11 @@ def build(n_images, seed=7, log=print):
 
 
 def pretrain(path, n_images, epochs, log=print, arch=None):
-    """arch: an architecture spec (archnet.py) to pretrain instead of the shipped CRNN."""
+    """arch: an architecture spec (htr.normalize) to pretrain instead of the shipped CRNN."""
     torch.set_num_threads(10); torch.manual_seed(0); X, Y, M = build(n_images, log=log)
     if arch is None: model = K.make("base")
     else:
-        import archnet; model = archnet.build(arch, len(C.CLASSES))
+        import htr; model = htr.build(arch, len(C.CLASSES))
     ctc = nn.CTCLoss(blank=C.BLANK_IDX, zero_infinity=True)
     opt = torch.optim.Adam(model.parameters(), lr=K.PRE_LR); idx = list(range(len(Y))); step = 0
     for ep in range(1, epochs + 1):

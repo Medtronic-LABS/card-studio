@@ -125,7 +125,7 @@ def main():
     ap = argparse.ArgumentParser(); ap.add_argument("run_dir"); ap.add_argument("--target", type=float, default=85.0); ap.add_argument("--min-n", type=int, default=20); ap.add_argument("--config", default=CFG, choices=CONFIG_NAMES, help="training preset: learning rate and augmentation strength")
     ap.add_argument("--seed", type=int, default=0, help="training seed (the folds do not change with it): run several to see how much a result moves by chance")
     ap.add_argument("--cv-only", action="store_true", help="stop after cross-validation: write cv_predictions.json and a short results.json, train no final reader and write no pack (what seed experiments use)")
-    ap.add_argument("--settings", default=None, help="JSON file: {\"preset\": ..., \"hp\": {every training value}, \"arch\": a preset name or an architecture spec (archnet.py)}; see settings.py")
+    ap.add_argument("--settings", default=None, help="JSON file: {\"preset\": ..., \"hp\": {every training value}, \"arch\": a preset name or an architecture spec (htr.normalize)}; see settings.py")
     ap.add_argument("--card", default=cards.LEGACY); ap.add_argument("--pretrained", default="auto", help="starting weights: auto (studio/pretrained/DEFAULT, else legacy), legacy, or a name from pretrained.py list"); ap.add_argument("--max-epochs", type=int, default=300, help="cap per CV fold (lower only for a quick trial)")
     ap.add_argument("--resume", action="store_true", help="continue a stopped or failed run from RUN_DIR/checkpoints (RUN_DIR/trainer_args.json holds everything else; no other option may be given)")
     a = ap.parse_args(); run = Path(a.run_dir); settings_raw = None

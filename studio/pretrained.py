@@ -8,7 +8,7 @@ Weights live in studio/pretrained/ (gitignored: the generator draws on the empty
     <name>.json    what made it: generator, number of images and epochs, recipe, the classes it was made for, a hash of the weights, when
     DEFAULT        the name a run uses when it asks for `auto` (absent: `legacy`)
 
-`legacy` is always available and is the original file. Weights belong to one network: each record carries `arch_sha256`, the hash of the architecture spec it was made for (archnet.py; a record without it is the shipped
+`legacy` is always available and is the original file. Weights belong to one network: each record carries `arch_sha256`, the hash of the architecture spec it was made for (htr's spec_hash; a record without it is the shipped
 CRNN). A run only accepts weights made for the network it trains; another architecture starts from scratch (`none`) or from weights pretrained for it
 (`python pretrained.py make NAME --arch crnn-wide`). A name is accepted only when its record exists, the weights hash matches the record, and the
 class list it was made for is the class list in model_meta.json now: weights for a different list would silently mislabel every character.
@@ -23,7 +23,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-sys.path.insert(0, str(ROOT / "work_phaseA")); sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(ROOT / "work_phaseA")); sys.path.insert(0, str(HERE)); sys.path.insert(0, str(ROOT))
 DIR = HERE / "pretrained"
 LEGACY = ROOT / "work_phaseA" / "pretrained.pt"
 NAME = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
@@ -38,8 +38,8 @@ def sha256(p):
 
 def arch_hash(arch=None):
     """Hash of the architecture a run or a weights file is for; None means the shipped CRNN."""
-    import archnet
-    return archnet.spec_hash(archnet.DEFAULT if arch is None else arch)
+    import htr
+    return htr.spec_hash(htr.DEFAULT if arch is None else arch)
 
 
 def classes_sha():
@@ -78,8 +78,8 @@ def list_all():
 def resolve(choice="auto", arch=None):
     """-> (path or None, record) for `auto`, `legacy`, `none` or a registered name, for the network `arch` (None: the shipped CRNN). `none` means start from scratch (path None).
     Raises ValueError saying what is wrong, for example weights made for another network."""
-    import archnet
-    want = arch_hash(arch); custom = arch is not None and not archnet.is_default(arch)
+    import htr
+    want = arch_hash(arch); custom = arch is not None and not htr.is_default(arch)
     scratch = ({"name": "none", "images": None, "epochs": None, "generator": "none: trained from scratch", "arch_hash": want, "ok": True, "problem": ""}, )[0]
     if choice == "none": return None, scratch
     if choice in (None, "", "auto") and custom:
@@ -104,7 +104,7 @@ def adopt(name, weights, note="", extra=None, arch=None):
     import synthgen
     DIR.mkdir(parents=True, exist_ok=True); shutil.copy2(weights, DIR / f"{name}.pt")
     rec = {"name": name, "made": time.strftime("%Y-%m-%d %H:%M"), "note": note, "sha256": sha256(DIR / f"{name}.pt"), "classes_sha256": classes_sha(), "architecture": "base CRNN, 0.54M parameters" if arch is None else f"{arch_description(arch)}", "arch_sha256": arch_hash(arch), "arch_name": "crnn" if arch is None else (arch if isinstance(arch, str) else "custom"),
-           **({} if arch is None else {"arch_spec": __import__("archnet").normalize(arch)}),
+           **({} if arch is None else {"arch_spec": __import__("htr").normalize(arch)}),
            "generator": "synthgen: grammars, empty-cell backgrounds, two-line layouts, damage", **(extra or {})}
     (DIR / f"{name}.json").write_text(json.dumps(rec, indent=1))
     if arch_hash(arch) == arch_hash() and not (DIR / "DEFAULT").exists(): (DIR / "DEFAULT").write_text(name)        # `auto` for the shipped network only ever means weights made for it
@@ -112,8 +112,8 @@ def adopt(name, weights, note="", extra=None, arch=None):
 
 
 def arch_description(arch):
-    import archnet
-    n = archnet.describe(archnet.normalize(arch))["params"]
+    import htr
+    n = htr.describe(htr.normalize(arch))["params"]
     return f"{arch if isinstance(arch, str) else 'custom architecture'}, {n / 1e6:.2f}M parameters"
 
 

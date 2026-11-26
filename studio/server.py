@@ -6,6 +6,7 @@ from pathlib import Path
 import csv
 import cv2
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cardpack"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))   # the card-studio root, for `import htr`
 import cardpack as cp
 from detect import detect_layout, load_normalized, match_score
 import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize, labruns, pretrained, external, extreader, testset, seedexp, datachecks, settings as train_settings
@@ -293,10 +294,10 @@ def start_pretrain(req):
     if any(r["name"] == name for r in pretrained.list_all()): raise ValueError(f"{name} already exists")
     images, epochs = int(req.get("images", 30000)), int(req.get("epochs", 4))
     if not (1000 <= images <= 200000 and 1 <= epochs <= 40): raise ValueError("images 1,000-200,000 and epochs 1-40")
-    import archnet
+    import htr
     arch = req.get("arch"); cmd = [sys.executable, str(HERE / "pretrained.py"), "make", name, "--images", str(images), "--epochs", str(epochs)]
-    if arch is not None and not archnet.is_default(arch):
-        norm = archnet.normalize(arch); f = RUNS / f"pretrain-{name}.arch.json"; f.parent.mkdir(exist_ok=True); f.write_text(json.dumps(norm)); cmd += ["--arch", str(f)]
+    if arch is not None and not htr.is_default(arch):
+        norm = htr.normalize(arch); f = RUNS / f"pretrain-{name}.arch.json"; f.parent.mkdir(exist_ok=True); f.write_text(json.dumps(norm)); cmd += ["--arch", str(f)]
     log = RUNS / f"pretrain-{name}.log"; log.parent.mkdir(exist_ok=True)
     _pre.update(proc=subprocess.Popen(cmd, stdout=open(log, "w"), stderr=subprocess.STDOUT, cwd=str(HERE)), name=name, log=log)
     return {"name": name}
@@ -449,7 +450,6 @@ class H(BaseHTTPRequestHandler):
         if p == "/api/pretrained": return self._send(200, pretrained.list_all())
         if p == "/api/train/settings": return self._send(200, train_settings.describe_all())
         if p == "/api/arch/custom":
-            import archnet  # side effect: puts the card-studio root (htr/) on sys.path, same as every other /api/arch/* route
             import htr.nn.custom as custom
             n = len(cards.meta()["classes"])
             out = []
@@ -580,20 +580,19 @@ class H(BaseHTTPRequestHandler):
             if self.path == "/api/pack/import": return self._import_pack(body)
             if self.path == "/api/template/grid": return self._save_grid(json.loads(body))
             if self.path == "/api/arch/check":
-                import archnet
-                return self._send(200, archnet.check(json.loads(body or b"{}").get("arch", archnet.DEFAULT), len(cards.meta()["classes"]), runs=10))
+                import htr
+                return self._send(200, htr.check(json.loads(body or b"{}").get("arch", htr.DEFAULT), len(cards.meta()["classes"]), runs=10))
             if self.path == "/api/arch/describe":
-                import archnet
-                return self._send(200, archnet.summary(json.loads(body or b"{}").get("arch", archnet.DEFAULT), len(cards.meta()["classes"])))
+                import htr
+                return self._send(200, htr.summary(json.loads(body or b"{}").get("arch", htr.DEFAULT), len(cards.meta()["classes"])))
             if self.path == "/api/arch/catalog":
-                import archnet  # side effect: puts the card-studio root (htr/) on sys.path, same as every other /api/arch/* route
                 import htr.catalog as K
                 return self._send(200, {"layer_types": {k: {"stage": v["stage"], "required": list(v["required"]), "backends": list(v["backends"])}
                                                          for k, v in K.LAYER_TYPES.items()}, "limits": K.LIMITS, "stages": list(K.STAGES)})
             if self.path == "/api/arch/compat":
-                import archnet
+                import htr
                 import htr.export.compat as compat
-                return self._send(200, compat.check(json.loads(body or b"{}").get("arch", archnet.DEFAULT)))
+                return self._send(200, compat.check(json.loads(body or b"{}").get("arch", htr.DEFAULT)))
             if self.path == "/api/pretrain": return self._send(200, start_pretrain(json.loads(body or b"{}")))
             if self.path == "/api/external/import":
                 b = json.loads(body or b"{}")

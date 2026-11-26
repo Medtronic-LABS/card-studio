@@ -2,6 +2,7 @@
 but fine-tuning data and early-stopping data are page-disjoint (split.json)."""
 import collections, copy, json, os, random, re, time, sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))   # the card-studio root, for `import htr`
 import hpspec
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
@@ -86,10 +87,10 @@ def resolve_cfg(base, overrides=None):
     return hpspec.resolve(base, overrides, CONFIGS)
 
 def new_model(arch=None):
-    """The network to train: the shipped CRNN when arch is None, else the architecture spec built by archnet.py."""
+    """The network to train: the shipped CRNN when arch is None, else the architecture spec built by htr.build."""
     if arch is None: return CRNN(len(CLASSES))
-    import archnet
-    return archnet.build(arch, len(CLASSES))
+    import htr
+    return htr.build(arch, len(CLASSES))
 
 def training_setup(model, rows, cfg, seed, max_epochs, mode=None):
     """-> (data loader, optimizer, scheduler or None) for a resolved config. The default config is the original recipe: balanced sampling by field, batch 64, Adam.
@@ -244,7 +245,7 @@ def _clone(sd): return {k: v.detach().clone() for k, v in sd.items()}
 
 def finetune(pre_state, train_rows, val_rows, cfg, seed=0, max_epochs=300, patience=80, log=print, arch=None, ck=None):
     """Train one reader on train_rows, keep the epoch that did best on val_rows (cfg monitor / min_delta / restore decide which and what is kept). pre_state: weights to start from,
-    or None to start from scratch. arch: an architecture spec (archnet.py), None for the shipped CRNN. cfg: a config from resolve_cfg (a bare preset dict from CONFIGS also works
+    or None to start from scratch. arch: an architecture spec (htr.normalize), None for the shipped CRNN. cfg: a config from resolve_cfg (a bare preset dict from CONFIGS also works
     and trains exactly as before). ck: a Checkpointer config (see Checkpointer) to write checkpoints and curves, honour STOP and resume; None = none of that.
     info["stopped"] is True when STOP ended it (the model is then the current, not the best, one)."""
     torch.manual_seed(seed)
