@@ -9,7 +9,7 @@ clean-up lab, benchmarks) can take an outside model's read.
     ExternalReader(onnx_path_or_bytes, spec).read(gray)    -> ("22/3/26", 0.93)
 
 Nothing here trains. An outside model can only be used as it is (a suggester, a benchmark); starting a training run from it needs weights in our own network's
-shape (studio/pretrained.py). This file is kept identical in Card Studio (studio/extreader.py) and the Frappe app (card_ocr/engine/extreader.py).
+shape (studio/pretrained.py). This file is kept identical in Card Studio (studio/extreader.py) and the Frappe app (card_studio/engine/extreader.py).
 """
 import json, math, re
 

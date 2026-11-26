@@ -10,7 +10,7 @@ Both only ever add a note (and for same_day a suggestion). They do not change a 
 named by its fields: checks = {"same_day": ["bcg", "penta1", ...], "increasing": ["visit_date"]}. Reads are {(field, visit): text}; a cell whose read is
 not trusted yet (low confidence, repaired by a grammar) goes in `weak`: it can be corrected by the others, but it does not vote.
 
-This file is kept identical in Card Studio (studio/cardlogic.py) and the Frappe app (card_ocr/engine/cardlogic.py).
+This file is kept identical in Card Studio (studio/cardlogic.py) and the Frappe app (card_studio/engine/cardlogic.py).
 """
 import collections
 import datetime
