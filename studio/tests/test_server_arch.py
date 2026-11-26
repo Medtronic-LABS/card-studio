@@ -62,6 +62,15 @@ class ArchRoutes(unittest.TestCase):
         st, b = self.call("POST", "/api/arch/compat", {"arch": {"custom": "example_tiny"}})
         self.assertEqual(st, 200); self.assertTrue(b["onnx"]["supported"]); self.assertFalse(b["rebuild"]["supported"])
 
+    def test_export_bench_reports_real_size_and_timing(self):
+        st, b = self.call("POST", "/api/export/bench", {"arch": "crnn-small", "width": 96, "runs": 3})
+        self.assertEqual(st, 200)
+        self.assertGreater(b["size_bytes"], 0); self.assertEqual(b["runs"], 3); self.assertGreaterEqual(b["p95_ms"], b["p50_ms"])
+
+    def test_export_bench_refuses_a_bad_spec(self):
+        st, b = self.call("POST", "/api/export/bench", {"arch": {"conv": []}})
+        self.assertEqual(st, 400)
+
 
 if __name__ == "__main__":
     unittest.main()

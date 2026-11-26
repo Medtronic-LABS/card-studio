@@ -74,6 +74,19 @@ class Bench(unittest.TestCase):
             self.assertGreaterEqual(r["p95_ms"], r["p50_ms"])
             self.assertEqual(r["runs"], 5)
 
+    def test_bench_arch_builds_exports_benches_and_cleans_up(self):
+        import htr.export.bench as B
+        before = set(Path(tempfile.gettempdir()).glob("*.onnx"))
+        r = B.bench_arch("crnn-small", n_classes=37, width=96, runs=3, warmup=1)
+        self.assertGreater(r["size_bytes"], 0)
+        self.assertEqual(r["runs"], 3)
+        after = set(Path(tempfile.gettempdir()).glob("*.onnx"))
+        self.assertEqual(before, after)   # no leftover .onnx temp file
+
+    def test_bench_arch_refuses_a_bad_spec(self):
+        import htr.export.bench as B
+        with self.assertRaises(ValueError): B.bench_arch({"conv": []}, n_classes=37)
+
 
 if __name__ == "__main__":
     unittest.main()

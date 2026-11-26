@@ -48,3 +48,27 @@ def bench_buckets(onnx_path_of_bucket, buckets, img_h, runs=20):
     """onnx_path_of_bucket(bucket_width) -> an ONNX file for that width (a caller has usually exported one per bucket already). ->
     {bucket: bench_onnx(...) report}, for the per-bucket latency a multi-signature TFLite pack will show in its own report."""
     return {b: bench_onnx(onnx_path_of_bucket(b), img_h, b, runs=runs) for b in buckets}
+
+
+def bench_arch(spec, n_classes=129, width=192, runs=20, warmup=3):
+    """Build `spec` (any htr.build-accepted config: legacy/schema-2/custom), export it to a throwaway ONNX file, bench it, and
+    clean up - the one-call version of `bench_onnx` for "how fast would this architecture be, before I train it" (`/api/export/
+    bench`). Needs torch."""
+    import os
+    import tempfile
+
+    import torch
+
+    import htr
+
+    net = htr.build(spec, n_classes).eval()
+    x = torch.zeros(1, 1, htr.IMG_H, width)
+    fd, path = tempfile.mkstemp(suffix=".onnx")
+    os.close(fd)
+    try:
+        with torch.no_grad():
+            torch.onnx.export(net, x, path, input_names=["image"], output_names=["logits"],
+                               dynamic_axes={"image": {0: "batch"}, "logits": {1: "batch"}}, opset_version=17, dynamo=False)
+        return bench_onnx(path, htr.IMG_H, width, runs=runs, warmup=warmup)
+    finally:
+        os.unlink(path)

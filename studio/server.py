@@ -606,6 +606,15 @@ class H(BaseHTTPRequestHandler):
                 import htr
                 import htr.export.compat as compat
                 return self._send(200, compat.check(json.loads(body or b"{}").get("arch", htr.DEFAULT)))
+            if self.path == "/api/export/bench":
+                import htr
+                import htr.export.bench as B
+                r = json.loads(body or b"{}")
+                try:
+                    report = B.bench_arch(r.get("arch", htr.DEFAULT), len(cards.meta()["classes"]), int(r.get("width", 192)),
+                                           runs=int(r.get("runs", 20)))
+                    return self._send(200, report)
+                except ValueError as e: return self._err(400, str(e))
             if self.path == "/api/pretrain": return self._send(200, start_pretrain(json.loads(body or b"{}")))
             if self.path == "/api/external/import":
                 b = json.loads(body or b"{}")
