@@ -54,12 +54,13 @@ _Aggregate numbers from the author's own labeled data, updated 2026-11-13. Held-
 
 | Piece | What it does |
 |---|---|
-| **Card Studio** (`studio/`) | A local web app: upload and identify a card, detect and edit its layout, add filled scans (each is matched to its template, straightened and cut into cells), label cells, train and gate a reader, compare runs, inspect model quality, and try photo clean-up options. Stdlib `http.server`, OpenCV, no framework. UI: [Tabler](https://tabler.io) (MIT), vendored, no CDN. |
+| **Card Studio** (`studio/`) | A local web app: upload and identify a card, detect and edit its layout, add filled scans (each is matched to its template, straightened and cut into cells), label cells, review and approve labels, train and gate a reader, compare runs, inspect model quality, and try photo clean-up options. Stdlib `http.server`, OpenCV, no framework. UI: [Tabler](https://tabler.io) (MIT), vendored, no CDN. Sidebar grouped into Data / Model / Tools; JS split into one file per tab under `studio/static/js/`. |
+| **Bengali HTR engine** (`htr/`) | The architecture lab behind the Train & Ship/Architecture tabs: a layer catalog (conv2d/dwsep/rnn/transformer/custom-Python blocks), legacy-spec-compatible + schema-2 + custom-module architectures (crnn, crnn-tiny/base/large, cnn-transformer, svtr-tiny, mobilenetv3-small, vgg7-bigru, or your own under `htr/custom/`), text/vocabulary/eval metrics for Bengali grapheme clusters, a dataset pipeline (manifest/splits/preprocess/augment/synth/public-dataset importers), training loop, and mobile export (ONNX, INT8 PTQ/QAT, a legacy TFLite rebuild backend, pluggable ai-edge-torch/onnx2tf backends). Pure-Python modules need no torch. |
 | **Card pack format** (`cardpack/`) | One zip holding everything a phone needs to recognise and read one card type: template, grid, field rules, reader model (ONNX, and the same weights as TensorFlow Lite), preprocessing. Versioned, hashed, validated. See [`cardpack/CARDPACK.md`](cardpack/CARDPACK.md). |
 | **Training recipe** (`work_phaseA/`) | CRNN + CTC reader (about 538k parameters), page-level splits, field-masked decoding, Wilson intervals. |
-| **Tools** (`tools/`) | The leak check, screenshot capture, README generator and publish script. |
+| **Tools** (`tools/`) | The leak check, screenshot capture, README generator, publish script, and `benchmark_device.py` (pushes a `.tflite` reader to a real phone over adb and times it). |
 
-Studio tabs: **Dashboard** (model registry, getting started, activity, what needs attention), **Label** (set each field's kind, then type what each cut cell says, one cell at a time from the keyboard, with a trained reader's suggestion to confirm or correct once the card has one; optionally send the cells to a local [Label Studio](https://labelstud.io) and pull its labels back; import corrected labels), **Train & Ship** (choose the starting weights, held-out gate per field; what each field still needs to pass; a measured learning curve that says roughly how many labeled cells the target would take), **History** (runs, paired comparison, experiment records, and live progress and results of the experiments started from the command line), **Model quality** (failure browser, calibration, risk-coverage, confusions, flag-policy tuner, provenance), **Playground** (pick a card and any model: a pack's reader, a training run's reader or a registered outside model; drop a photo and see every cell with its crop, read and confidence; add a `.cardpack`, which brings its template and reader together), **Clean-up lab** (try each photo clean-up on one photo), **How to use** (these steps, and how the reader works).
+Studio tabs, grouped in the sidebar - **Data**: **Cards** (dashboard: model registry, getting started, activity, what needs attention), **Label** (set each field's kind, then type what each cut cell says, one cell at a time from the keyboard, with a trained reader's suggestion to confirm or correct once the card has one; optionally send the cells to a local [Label Studio](https://labelstud.io) and pull its labels back; import corrected labels), **Review** (approve, reject or flag a labeled cell before it can train on; a rejected one never trains; a suggested reason - AI disagreement, a grammar check, a lazily-confirmed low-confidence suggestion, a length outlier - flags one for attention). **Model**: **Train & Ship** (choose the starting weights, held-out gate per field, what each field still needs to pass, a measured learning curve), **Architecture** (pick a preset, build a schema-2 layer list, or point at a custom Python module; a live isometric shape diagram, per-backend export compat badges, and a real on-machine speed/size benchmark before you train it), **History** (runs, paired comparison, experiment records, live progress of command-line experiments), **Model quality** (failure browser, calibration, risk-coverage, confusions, flag-policy tuner, provenance, and a sortable table of `htr.train.loop` line-dataset runs). **Tools**: **Playground** (pick a card and any model: a pack's reader, a training run's reader or a registered outside model; drop a photo and see every cell with its crop, read and confidence; add a `.cardpack`, which brings its template and reader together), **Clean-up lab** (try each photo clean-up on one photo). **How to use** (these steps, and how the reader works).
 
 ## How to use
 
@@ -105,10 +106,13 @@ python tools/leakcheck.py .                                    # nothing patient
 ## Layout
 
 ```
-studio/        web app: server.py, trainer.py, detect.py, cleanup.py, mlstats.py, analysis.py, history.py, experiments.py, ... and tests/
+studio/        web app: server.py, trainer.py, detect.py, cleanup.py, mlstats.py, analysis.py, history.py, experiments.py,
+                review.py, active.py, autotrain.py, promote.py, ... static/js/ (one file per tab), and tests/
+htr/           the Bengali HTR engine: text.py, vocab.py, catalog.py, spec.py, presets.py, legacy.py, custom/, data/, eval/,
+                export/, nn/, train/ - see each module's own docstring
 cardpack/      card pack format: CARDPACK.md, schema/, cardpack.py (build, read, validate), synthetic.py
 work_phaseA/   training recipe and evaluation scripts (code only)
-tools/         leakcheck.py, screenshots.py, update_readme.py, publish.py
+tools/         leakcheck.py, screenshots.py, update_readme.py, publish.py, benchmark_device.py
 docs/          screenshots/ (registered in MANIFEST.json), status.json
 ```
 
