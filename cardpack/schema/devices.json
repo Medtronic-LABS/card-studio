@@ -1,0 +1,8 @@
+{
+ "schema": "devices/1",
+ "note": "The device matrix tools/benchmark_device.py pushes a reader.tflite + the LiteRT benchmark_model binary to, and the promotion targets (studio/promote.py MOBILE_TARGETS) that are supposed to hold on the entry device. Edit this file to match whatever test devices are actually on hand; it is not read by anything except benchmark_device.py and a human comparing a bench report's device id against a label here.",
+ "devices": [
+  {"id": "entry-12nm", "label": "Entry-tier, 12nm-class SoC", "example": "MediaTek Helio A22 / similar", "process_node_nm": 12, "ram_gb": 2, "android_api_min": 24, "targets": {"size_bytes": [5000000, 15000000], "peak_rss_mb": 100, "p50_ms": 300}},
+  {"id": "mid-6nm", "label": "Mid-tier, 6nm-class SoC", "example": "MediaTek Helio G99 / similar", "process_node_nm": 6, "ram_gb": 4, "android_api_min": 26, "targets": {"size_bytes": [5000000, 15000000], "peak_rss_mb": 150, "p50_ms": 150}}
+ ]
+}
