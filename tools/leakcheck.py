@@ -42,6 +42,7 @@ def check(root):
         if not p.is_file() or ".git" in p.relative_to(root).parts[:1] or "__pycache__" in p.parts: continue
         rel = p.relative_to(root).as_posix(); ext = p.suffix.lower(); parts = set(p.relative_to(root).parts[:-1])
         bad_dir = parts & DENY_DIRS
+        if rel.startswith("htr/data/"): bad_dir -= {"data"}     # htr/data is code (dataset engineering modules), not a data directory; the actual dataset root is bengali_dataset/
         if bad_dir: out.append(f"{rel}: inside a data directory ({', '.join(sorted(bad_dir))})"); continue
         if ext in DENY_EXT: out.append(f"{rel}: file type {ext} is never allowed (images, models, packs, labels, notebooks, PDFs)"); continue
         if p.stat().st_size > MAX_BYTES: out.append(f"{rel}: {p.stat().st_size} bytes is over the {MAX_BYTES} limit"); continue
