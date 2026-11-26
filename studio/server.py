@@ -500,6 +500,13 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, labeling.queue(m[1], g("field") or None, g("show", "todo"), int(g("limit", "60")), g("after"), g("order", "reading")))
             except KeyError as e: return self._err(404, str(e).strip("'\""))
             except ValueError as e: return self._err(400, str(e))
+        m = re.fullmatch(r"/api/card/([\w-]{1,40})/review", p)
+        if m:
+            import review
+            q = parse_qs(urlparse(self.path).query)
+            try: return self._send(200, {"cells": review.queue(m[1], q.get("show", ["needs_attention"])[0])})
+            except KeyError as e: return self._err(404, str(e).strip("'\""))
+            except ValueError as e: return self._err(400, str(e))
         m = re.fullmatch(r"/api/card/([\w-]{1,40})/crop/(\w{1,40})/(c\d{1,2})/([\w-]{1,40})\.png", p)
         if m:
             try: return self._send(200, labeling.crop_path(m[1], m[2], m[3], m[4]).read_bytes(), "image/png")
@@ -642,6 +649,16 @@ class H(BaseHTTPRequestHandler):
                 if m[2] == "label": return self._send(200, labeling.save(m[1], *cell, str(r.get("label", "")), str(r.get("note", "")), bool(r.get("confirm"))))
                 if m[2] == "label/clear": return self._send(200, labeling.clear(m[1], *cell))
                 return self._send(200, labeling.set_field(m[1], str(r.get("key", "")), str(r.get("kind", "")), r.get("range"), r.get("layout")))
+            m = re.fullmatch(r"/api/card/([\w-]{1,40})/review/(set|migrate)", self.path)
+            if m:
+                import review
+                if m[2] == "migrate": return self._send(200, review.migrate(m[1]) or {"skipped": "review.csv already exists"})
+                r = json.loads(body or b"{}")
+                try:
+                    return self._send(200, review.set_status(m[1], str(r.get("page", "")), str(r.get("field", "")), str(r.get("col", "")),
+                                                              str(r.get("status", "")), str(r.get("reviewer", "")), str(r.get("reason", ""))))
+                except KeyError as e: return self._err(404, str(e).strip("'\""))
+                except ValueError as e: return self._err(400, str(e))
             m = re.fullmatch(r"/api/pack/([\w.-]+)/tflite", self.path)
             if m:
                 f = HERE.parent / "cardpack" / "out" / m[1]

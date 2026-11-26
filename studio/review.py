@@ -128,6 +128,29 @@ def _length_outliers(card, labeled):
     return out
 
 
+def queue(card, show="needs_attention"):
+    """Cells for the review screen. show: "needs_attention" (pending+flagged, default), "approved", "rejected", or "all".
+    -> [{"page","field","col","label","status","reviewer","reviewed","reason"}, ...], sorted by field then page then col.
+    Calls `sync` first, so a freshly labeled or re-labeled cell is always current. "reason" comes from the review row when the
+    cell was flagged with one, else from `suggest_flags` for a cell this call is about to show anyway (an approved/rejected cell
+    already has a human decision recorded, so it is never worth the extra work)."""
+    if show not in ("needs_attention", "approved", "rejected", "all"): raise ValueError('show must be needs_attention, approved, rejected or all')
+    sync(card)
+    labeled = _current_labels(card)
+    statuses = read(card)
+    want = {"needs_attention": {"pending", "flagged"}, "approved": {"approved"}, "rejected": {"rejected"}, "all": set(STATUSES)}[show]
+    flags = suggest_flags(card) if show in ("needs_attention", "all") else {}
+    out = []
+    for key, label in labeled.items():
+        st = statuses.get(key, {"status": "pending", "reviewer": "", "reviewed": "", "reason": ""})
+        if st["status"] not in want: continue
+        page, field, col = key
+        out.append({"page": page, "field": field, "col": col, "label": label, "status": st["status"], "reviewer": st["reviewer"],
+                    "reviewed": st["reviewed"], "reason": st["reason"] or flags.get(key, "")})
+    out.sort(key=lambda r: (r["field"], r["page"], r["col"]))
+    return out
+
+
 def suggest_flags(card):
     """Candidates for review attention, not auto-applied: -> {(page,row,col): reason}.
     - a label that disagrees with what the AI currently suggests for that cell
