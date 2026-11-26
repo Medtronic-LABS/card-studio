@@ -102,21 +102,32 @@ def queue(card, field=None, show="todo", limit=60, after=None, order_by="reading
     """Cells to label. show: `todo` = inked and not done, `done` = already has a row (to review), `uninked` = cells the ink gate called
     empty (to catch what it missed), `disagree` = done cells whose label differs from what the AI suggests now (to catch typos, and AI errors
     that were accepted). order_by: `reading` (field, page, visit), `unsure` (the AI's least confident first: the labels that teach the reader
-    most), `sure` (most confident first: the quickest to confirm). `after` = "page|field|visit" of the last cell already shown (reading order)."""
+    most), `sure` (most confident first: the quickest to confirm), `active` (studio.active's weighted score - unsure, hard graphemes, an
+    unseen writer - round-robined across fields so one hard field doesn't bury the rest). `after` = "page|field|visit" of the last cell
+    already shown (reading order; ignored for the other three, which have their own order)."""
     import suggest
     _card(card); cells = _cells(card); done = _read(card); order = {f["key"]: i for i, f in enumerate(cards.fields(card))}; sug = suggest.read(card)
     own = cards.pack_id(card) + " v"       # a suggestion from this card's own reader; one borrowed from another card's reader is never pre-filled
     if field is not None and field not in order: raise KeyError("no such field")
     if show not in ("todo", "done", "uninked", "disagree"): raise ValueError("show must be todo, done, uninked or disagree")
-    if order_by not in ("reading", "unsure", "sure"): raise ValueError("order_by must be reading, unsure or sure")
+    if order_by not in ("reading", "unsure", "sure", "active"): raise ValueError("order_by must be reading, unsure, sure or active")
     differs = lambda k: k in done and k in sug and done[k]["label"] != "" and sug[k]["text"] != done[k]["label"]
     keys = [k for k, ink in cells.items() if k[1] in order and (field is None or k[1] == field)
             and ((show == "todo" and ink and k not in done) or (show == "done" and k in done) or (show == "uninked" and not ink and k not in done) or (show == "disagree" and differs(k)))]
     sk = lambda k: (order[k[1]], k[0], int(k[2][1:]))
     keys.sort(key=sk)
-    if order_by != "reading":       # cells the AI said nothing about go last either way
+    if order_by in ("unsure", "sure"):       # cells the AI said nothing about go last either way
         conf = lambda k: sug[k]["confidence"] if k in sug else None
         keys.sort(key=lambda k: (conf(k) is None, (conf(k) or 0) * (1 if order_by == "unsure" else -1)))
+    elif order_by == "active":
+        import active
+        w = cards.writers(card); seen_writers = {w[p] for (p, _, _) in done if p in w}
+        scored = []
+        for k in keys:
+            s = sug.get(k); suggestion = {"text": s["text"], "confidence": s["confidence"]} if s else None
+            signals = active.compute_signals(suggestion, w.get(k[0]), None, seen_writers, set())
+            scored.append({"key": k, "field": k[1], "score": active.score(signals)})
+        keys = [c["key"] for c in active.queue_order(scored, "field")]
     elif after:
         a = tuple(after.split("|"))
         if len(a) == 3 and a[1] in order and cards.COL.match(a[2]): keys = [k for k in keys if sk(k) > (order[a[1]], a[0], int(a[2][1:]))]

@@ -213,14 +213,23 @@ def _imported(card):
             if (r.get("pack") or LEGACY) == pid]
 
 
-def labels(card, holdout=False):
+def labels(card, holdout=False, min_status=None):
     """-> (rows, problems). rows: [{page,row,col,label,crop}], sorted, one per cell, later sources win (labels.csv, labels_new.csv, imports).
     `anc` rows keep crop "" (the trainer reads work/crops) unless the crop was imported. Other cards carry the crop path and are checked:
     a row whose field is not in the grid, whose crop is missing or whose label has a character the field cannot emit is left out and counted.
-    Pages in the card's held-out test set (holdout.json) are NOT returned, so no training, tuning, learning curve or comparison can see them; holdout=True returns only those."""
+    Pages in the card's held-out test set (holdout.json) are NOT returned, so no training, tuning, learning curve or comparison can see them; holdout=True returns only those.
+    min_status: None (default, unchanged) returns every labeled cell regardless of review status; "approved" returns only cells
+    `review.py` has approved; "pending" returns approved, pending and flagged cells (excludes only rejected). A cell with no row in
+    review.csv counts as pending. See `review.sync`/`review.migrate` for how that file gets populated."""
     rows, bad = _labels(card)
     held = holdout_pages(card)
-    return ([r for r in rows if r["page"] in held] if holdout else [r for r in rows if r["page"] not in held]), bad
+    rows = [r for r in rows if r["page"] in held] if holdout else [r for r in rows if r["page"] not in held]
+    if min_status is not None:
+        import review
+        status = review.read(card)
+        allowed = review.MIN_STATUS_ALLOWS[min_status]
+        rows = [r for r in rows if status.get((r["page"], r["row"], r["col"]), {"status": "pending"})["status"] in allowed]
+    return rows, bad
 
 
 def _labels(card):
