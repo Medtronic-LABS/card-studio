@@ -142,9 +142,9 @@ async function loadPacks(){const [packs,tpls,runs,lab]=await Promise.all([api('/
  let cds=[],scs=[];try{[cds,scs]=await Promise.all([api('/api/cards'),api('/api/scans')])}catch(e){}
  const grids=cds.filter(c=>c.grid).length,nscan=scs.reduce((a,s)=>a+((s.totals||{}).scans||0),0),ready=cds.filter(c=>c.trainable),lp=Math.max(0,...cds.map(c=>c.labels.pages)),tfl=Object.values(details).filter(d=>d.manifest.reader.tflite).length;
  const imp=(lab.imported&&lab.imported.total)||0,steps=[
-  [tpls.length>0,'Save a card template',`${tpls.length} saved`,['Add one',"document.getElementById('drop2').scrollIntoView({behavior:'smooth'})"]],
-  [grids>0,'Save a grid for a template',`${grids} template${grids===1?'':'s'} with a grid`,['Layouts',"document.getElementById('tpls').scrollIntoView({behavior:'smooth'})"]],
-  [nscan>0,'Add filled scans',`${nscan} scan${nscan===1?'':'s'} cut into cells`,['Filled scans',"document.getElementById('sbody').scrollIntoView({behavior:'smooth'})"]],
+  [tpls.length>0,'Save a card template',`${tpls.length} saved`,['Add one',"goIntake('drop2')"]],
+  [grids>0,'Save a grid for a template',`${grids} template${grids===1?'':'s'} with a grid`,['Layouts',"goIntake('tpls')"]],
+  [nscan>0,'Add filled scans',`${nscan} scan${nscan===1?'':'s'} cut into cells`,['Filled scans',"goIntake('sbody')"]],
   [ready.length>0,'Label cells on 10 pages of a card',`most on one card: ${lp} page${lp===1?'':'s'}`,['Label',"tab('label')"]],
   [runs.some(r=>r.state==='done'),'Train a reader',`${runs.length} run${runs.length===1?'':'s'}`,['Train & ship',"tab('train')"]],
   [!!best&&best.ship>0,'Get a field to ship',best?`${best.ship} of ${best.fields} fields (${esc(best.id)} v${best.version})`:'no pack yet',['Train & ship',"tab('train')"]],
@@ -185,7 +185,9 @@ function loadStats(){loadDash();Promise.all([api('/api/packs'),api('/api/labels/
   c('Labeled cells',l.cells+(l.imported&&l.imported.total?` <span class="tag" style="font-size:14px">+${l.imported.total}</span>`:''),`${l.pages} pages${l.imported&&l.imported.total?' · +imported':''}`,'',"tab('label')")+
   c('Held-out exact match',cv==null?'-':(cv*100).toFixed(0)+'%',cv==null?'no run yet':'pooled 5-fold CV, by page','',"tab('history')")+
   c('Template ID test',hb?`${hb.anc_ok[0]}/${hb.anc_ok[1]}`:'-',hb?`ANC accepted; ${hb.other_as_anc[0]}/${hb.other_as_anc[1]} non-ANC wrongly accepted (simulated photos)`:'not run','','window.open(\'/idtest\')')}).catch(()=>{})}
-function refreshCards(){loadStats();loadIdSum();loadPacks().catch(e=>{$('packs').innerHTML=`<div class="msg bad">${esc(e.message)}</div>`});loadTpls().catch(()=>{});loadScans()}
+function refreshDash(){loadStats();loadPacks().catch(e=>{$('packs').innerHTML=`<div class="msg bad">${esc(e.message)}</div>`})}
+function refreshIntake(){loadIdSum();loadTpls().catch(()=>{});loadScans()}
+function goIntake(id){tab('intake');setTimeout(()=>{const e=document.getElementById(id);if(e)e.scrollIntoView({behavior:'smooth'})},250)}
 
 let PV=null;
 async function packTflite(file){const b=$('pvtf'),o=$('pvtfmsg');b.disabled=true;o.textContent='Converting and checking against the ONNX reader…';

@@ -22,7 +22,7 @@ function mlPick(key,quiet){MLX.sel=key;mlNav();const o=MLX.o,box=$('mlruns');$('
  if(key.startsWith('tpl:')){const t=o.templates.find(x=>'tpl:'+x.name===key);if(!t)return;const st=t.stages,chip=(ok,l)=>`<span class="${ok?'ok':''}">${ok?'&#10003; ':''}${l}</span>`;
   box.innerHTML=`<div class="card"><h2>${esc(t.name)} <span class="tag">template v${t.latest}</span></h2><div class="stg">${chip(st.layout,'Layout saved')}${chip(st.grid,'Reader grid saved')}${chip(st.labels>0,'Labeled cells: '+st.labels)}${chip(st.run,'Training run')}${chip(st.pack,'Pack')}</div>
    <div class="tag">No model quality exists for this template: it has a layout${st.grid?' and a reader grid':''} but no labeled cells, no training run and no pack, so there is nothing held-out to measure. The trainer today reads ANC-style tables only, so training for a new card type is the next piece of work, not a button here.</div>
-   <div class="row"><button class="btn" onclick="tab('cards');setTimeout(()=>document.getElementById('tpls').scrollIntoView({behavior:'smooth'}),200)">Open the template</button></div></div>`;return}
+   <div class="row"><button class="btn" onclick="goIntake('tpls')">Open the template</button></div></div>`;return}
  const c=o.card_types.find(x=>'ct:'+x.id===key);if(!c)return;
  if(!c.runs.length){box.innerHTML=`<div class="card"><h2>${esc(c.name)}</h2><div class="tag">No finished training run for this card type yet.</div></div>`;return}
  const best=(f,hi)=>{const v=c.runs.map(f);return hi?Math.max(...v):Math.min(...v)},mark=(v,b,hi)=>c.runs.length>1&&Math.abs(v-b)<1e-12?' <span class="badge bg-green-lt">best</span>':'';
