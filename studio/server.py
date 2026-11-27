@@ -176,6 +176,19 @@ def train_status():
     return out
 
 
+def check_settings(req):
+    """Validate training settings (and the starting weights) without starting anything, so the Train card can mark the field that is wrong
+    before Train is pressed. -> {ok, errors: [{key, message}]}; `key` is the value the message names (None when it names none)."""
+    sett, start = req.get("settings") or {}, str(req.get("pretrained", "auto"))
+    try:
+        parsed = train_settings.load(sett); pretrained.resolve(start, parsed["arch"])
+    except ValueError as e:
+        msg = str(e); d = train_settings.describe_all()
+        keys = [*d["hp"], *d["aug"], *d["run"], "preset", "arch"]
+        return {"ok": False, "errors": [{"key": "arch" if "architecture" in msg.lower() else next((k for k in keys if re.search(rf"\b{re.escape(k)}\b", msg)), None), "message": msg}]}
+    return {"ok": True, "errors": []}
+
+
 def start_training(req):
     global _proc
     if _proc is not None and _proc.poll() is None:
@@ -600,6 +613,7 @@ class H(BaseHTTPRequestHandler):
             if self.path.split("?")[0] == "/api/analyze": return self._analyze(body, parse_qs(urlparse(self.path).query))
             if self.path == "/api/save": return self._save(json.loads(body))
             if self.path == "/api/train/start": return self._send(200, start_training(json.loads(body or b"{}")))
+            if self.path == "/api/train/settings/check": return self._send(200, check_settings(json.loads(body or b"{}")))
             if self.path == "/api/train/stop": return self._send(200, stop_training())
             if self.path == "/api/train/resume": return self._send(200, resume_training(json.loads(body or b"{}")))
             if self.path.split("?")[0] == "/api/cleanup": return self._cleanup(body, parse_qs(urlparse(self.path).query))

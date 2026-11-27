@@ -88,6 +88,7 @@ A field is shipped only if the **lower end of its 95% interval**, measured on pa
 ### Training options
 
 - **Evaluation.** The default is 5-fold cross-validation. In Train & Ship you can instead pick **Fixed split** (validation % and test %): whole writers (or pages, when writers are unknown) go to exactly one of train / validation / test, and only the test part is scored for the gate. The same from the command line: `python studio/trainer.py RUN --card anc --val-frac 0.15 --test-frac 0.15`. Fewer held-out cells means fewer fields reach the minimum, so the preview warns which ones. The shipped reader is still trained on all pages, as with cross-validation.
+- **Network and recipe on the Train card.** Pick the architecture (including `big-crnn` and `attn`, the two readers `studio/capacity.py` compares by hand), edit it as JSON, and set the preset, learning rate, batch, optimizer, schedule and epochs without leaving Train & Ship; the Training settings tab has every other value and edits the same settings. Values are checked against the trainer's limits as you change them (`POST /api/train/settings/check`), the field that is wrong is named, and Train stays disabled until they pass. **Download / Load settings.json** is the exact file `trainer.py --settings` takes.
 
 ## Quick start
 

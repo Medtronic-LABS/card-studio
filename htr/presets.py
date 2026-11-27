@@ -26,6 +26,16 @@ PRESETS = {
         "backbone": [{"type": "conv2d", "out": 64, "k": 3, "pool": [2, 2]}, {"type": "dwsep", "out": 128, "k": 3, "pool": [2, 2]},
                      {"type": "dwsep", "out": 256, "k": 3, "pool": [2, 1]}, {"type": "dwsep", "out": 256, "k": 3, "pool": "collapse"}],
         "sequence": [{"type": "rnn", "hidden": 256, "layers": 2, "bidirectional": True, "dropout": 0.2}], "head": {"dropout": 0.3}, "decoder": {"type": "ctc"}}},
+    "big-crnn": {"label": "Big CRNN (studio/capacity.py's big_crnn): four plain 64-128-256-256 convolutions, a two-layer 288-unit BiLSTM", "spec": {
+        "schema": 2, "input": {"height": 48, "width": "dynamic", "channels": 1},
+        "backbone": [{"type": "conv2d", "out": 64, "k": 3, "pool": [2, 2]}, {"type": "conv2d", "out": 128, "k": 3, "pool": [2, 2]},
+                     {"type": "conv2d", "out": 256, "k": 3, "pool": [2, 1]}, {"type": "conv2d", "out": 256, "k": 3, "pool": "collapse"}],
+        "sequence": [{"type": "rnn", "hidden": 288, "layers": 2, "bidirectional": True, "dropout": 0.2}], "head": {"dropout": 0.3}, "decoder": {"type": "ctc"}}},
+    "attn": {"label": "Attention CTC (studio/capacity.py's attn): the same four convolutions, a four-layer 288-wide Transformer encoder", "spec": {
+        "schema": 2, "input": {"height": 48, "width": "dynamic", "channels": 1},
+        "backbone": [{"type": "conv2d", "out": 64, "k": 3, "pool": [2, 2]}, {"type": "conv2d", "out": 128, "k": 3, "pool": [2, 2]},
+                     {"type": "conv2d", "out": 256, "k": 3, "pool": [2, 1]}, {"type": "conv2d", "out": 256, "k": 3, "pool": "collapse"}],
+        "sequence": [{"type": "transformer", "dim": 288, "heads": 6, "layers": 4, "ff_mult": 4, "dropout": 0.1}], "head": {"dropout": 0.1}, "decoder": {"type": "ctc"}}},
     "cnn-transformer": {"label": "CNN backbone, a small Transformer encoder instead of an RNN", "spec": {
         "schema": 2, "input": {"height": 48, "width": "dynamic", "channels": 1},
         "backbone": [{"type": "conv2d", "out": 32, "k": 3, "pool": [2, 2]}, {"type": "conv2d", "out": 64, "k": 3, "pool": [2, 2]},
