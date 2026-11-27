@@ -193,12 +193,17 @@ def start_training(req):
     start = str(req.get("pretrained", "auto"))
     max_epochs = int(req.get("max_epochs", 300))
     if not 5 <= max_epochs <= 1000: raise ValueError("max_epochs must be 5-1000")
+    split = req.get("split") or None          # {val_frac, test_frac}: one fixed split instead of 5-fold cross-validation
+    if split:
+        vf, tf = float(split.get("val_frac", 0)), float(split.get("test_frac", 0))
+        if not (0.05 <= vf <= 0.5 and 0.05 <= tf <= 0.5 and vf + tf <= 0.6): raise ValueError("validation and test must each be 5% to 50%, and together at most 60%")
     sett = req.get("settings") or {}
     parsed = train_settings.load(sett)        # raises, saying what is wrong, for a bad value or architecture
     pretrained.resolve(start, parsed["arch"])        # raises, saying why, when these starting weights cannot be used (or were made for another network)
     d = RUNS / time.strftime("run-%Y%m%d-%H%M%S"); d.mkdir(parents=True)
     json.dump({"stage": "labels", "detail": "starting", "elapsed": 0, "target": target, "min_n": min_n, "card": card}, open(d / "status.json", "w"))
     cmd = [sys.executable, str(HERE / "trainer.py"), str(d), "--card", card, "--target", str(target), "--min-n", str(min_n), "--pretrained", start, "--max-epochs", str(max_epochs)]
+    if split: cmd += ["--val-frac", str(vf), "--test-frac", str(tf)]
     if sett:
         (d / "settings.json").write_text(json.dumps(sett, indent=1)); cmd += ["--settings", str(d / "settings.json")]
     _proc = subprocess.Popen(cmd, stdout=open(d / "log.txt", "w"), stderr=subprocess.STDOUT, cwd=str(HERE)); _cur["dir"] = d
@@ -559,6 +564,14 @@ class H(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/run/([^/]+)/curves", p)
         if m:
             try: return self._send(200, run_curves(m[1]))
+            except ValueError as e: return self._err(400, str(e))
+        m = re.fullmatch(r"/api/card/([\w-]{1,40})/split/preview", p)
+        if m:
+            if not cards.exists(m[1]): return self._err(404, "no such card")
+            q = parse_qs(urlparse(self.path).query)
+            try:
+                import trainer
+                return self._send(200, trainer.split_preview(m[1], float(q.get("val", ["0.15"])[0]), float(q.get("test", ["0.15"])[0]), int(q.get("min_n", ["20"])[0])))
             except ValueError as e: return self._err(400, str(e))
         m = re.fullmatch(r"/api/card/([\w-]{1,40})/checklist", p)
         if m:

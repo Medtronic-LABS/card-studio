@@ -85,6 +85,10 @@ A reader is pretrained on synthetic cells before it sees your labels. The choice
 
 A field is shipped only if the **lower end of its 95% interval**, measured on pages the model never saw (pooled 5-fold cross-validation, split by page), meets a target with enough cells. Otherwise it stays **needs-review**. Only held-out numbers are called accuracy; numbers on training pages are labelled as such. Intervals are optimistic because cells on a page are correlated.
 
+### Training options
+
+- **Evaluation.** The default is 5-fold cross-validation. In Train & Ship you can instead pick **Fixed split** (validation % and test %): whole writers (or pages, when writers are unknown) go to exactly one of train / validation / test, and only the test part is scored for the gate. The same from the command line: `python studio/trainer.py RUN --card anc --val-frac 0.15 --test-frac 0.15`. Fewer held-out cells means fewer fields reach the minimum, so the preview warns which ones. The shipped reader is still trained on all pages, as with cross-validation.
+
 ## Quick start
 
 ```sh

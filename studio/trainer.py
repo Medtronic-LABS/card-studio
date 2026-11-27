@@ -44,6 +44,44 @@ def make_folds(rows, k=5, tries=4000, units=None):
     return [sorted(p for p in pages if units[p] in set(g)) for g in best[1]]
 
 
+def make_split(rows, val_frac, test_frac, tries=4000, units=None):
+    """One fixed train / validation / test split instead of k folds. Whole units (cards.split_units: a writer's pages, or a page) go to exactly one
+    part, so the test part is people the reader never trained on. Same seeded best-of-N deal as make_folds, scored so every field keeps cells in
+    both test and validation. -> (train_pages, val_pages, test_pages), each sorted."""
+    pages = sorted({r["page"] for r in rows}); units = units or {p: p for p in pages}; uo = sorted({units[p] for p in pages}); by = collections.defaultdict(collections.Counter)
+    for r in rows: by[units[r["page"]]][r["row"]] += 1
+    n = len(uo); n_test = max(1, round(n * test_frac)); n_val = max(1, round(n * val_frac))
+    if n - n_test - n_val < 1: raise ValueError(f"{n} unit(s) cannot be split into {n_val} validation, {n_test} test and at least 1 training")
+    tot = collections.Counter(r["row"] for r in rows); fields = [f for f, c in tot.items() if c >= 10]; cells = sum(tot.values())
+    rng = random.Random(SEED); best = None
+    for _ in range(tries):
+        s = uo[:]; rng.shuffle(s); te, va = s[:n_test], s[n_test:n_test + n_val]
+        ct, cv = collections.Counter(), collections.Counter()
+        for u in te: ct.update(by[u])
+        for u in va: cv.update(by[u])
+        off = abs(sum(ct.values()) / cells - test_frac) + abs(sum(cv.values()) / cells - val_frac)
+        key = (sum(min(ct[x], cv[x]) for x in fields), -off)
+        if best is None or key > best[0]: best = (key, set(te), set(va))
+    te_u, va_u = best[1], best[2]
+    part = lambda us: sorted(p for p in pages if units[p] in us)
+    return part(set(uo) - te_u - va_u), part(va_u), part(te_u)
+
+
+def split_preview(card, val_frac, test_frac, min_n=20):
+    """What a fixed split would look like for this card, without training: units, pages and labeled cells per part, and the fields that would
+    have fewer than `min_n` test cells (they could not pass the gate). Raises ValueError for fractions or data the split cannot use."""
+    if not (0.05 <= val_frac <= 0.5 and 0.05 <= test_frac <= 0.5 and val_frac + test_frac <= 0.6): raise ValueError("validation and test must each be 5% to 50%, and together at most 60%")
+    rows, _ = cards.labels(card); pages = sorted({r["page"] for r in rows})
+    if len(pages) < cards.MIN_PAGES: raise ValueError(f"{len(pages)} labeled page(s): training needs at least {cards.MIN_PAGES}")
+    units, unit, n_units = cards.split_units(card, pages)
+    if n_units < 3: raise ValueError(f"{n_units} {unit}(s): a fixed split needs at least 3")
+    tr, va, te = make_split(rows, val_frac, test_frac, units=units); where = {p: n for n, ps in (("train", tr), ("val", va), ("test", te)) for p in ps}
+    cells = collections.Counter(where[r["page"]] for r in rows); test_n = collections.Counter(r["row"] for r in rows if where[r["page"]] == "test")
+    short = sorted(f for f in {r["row"] for r in rows} if test_n[f] < min_n)
+    return {"unit": unit, "units": n_units, "pages": {"train": len(tr), "val": len(va), "test": len(te)}, "cells": {k: cells[k] for k in ("train", "val", "test")},
+            "units_per_part": {n: len({units[p] for p in ps}) for n, ps in (("train", tr), ("val", va), ("test", te))}, "short_fields": short, "min_n": min_n}
+
+
 def grammar_spec(card):
     """{field: {kind, range, years}} for the fields whose output can also be read against a grammar (constrained.py): dates, blood pressures, ranged
     numbers, one line each. Taken from the pack this run starts from."""
@@ -54,11 +92,12 @@ def grammar_spec(card):
 
 def cv_job(a):
     fold, folds, merged, card, max_epochs, gspec, weights, cfg, arch, seed = a[:10]; ck = a[10] if len(a) > 10 else None          # ck: where this run keeps checkpoints, curves, STOP (None = none of that)
+    val_pages = a[11] if len(a) > 11 else None          # fixed split: the validation pages chosen up front (None = CV: a seeded sample of the non-test pages)
     import torch; import common as C, train as T
     torch.set_num_threads(2); C.use_fields(cards.masks(card))
     rows = C.read_labels(merged); pre = torch.load(weights) if weights else None           # no weights: this architecture starts from scratch
     test_pages = set(folds[fold]); rest = sorted({r["page"] for r in rows} - test_pages)
-    vp = set(random.Random(1000 + fold).sample(rest, max(4, round(len(rest) / 7))))
+    vp = set(val_pages) if val_pages else set(random.Random(1000 + fold).sample(rest, max(4, round(len(rest) / 7))))
     tr = [r for r in rows if r["page"] in rest and r["page"] not in vp]; va = [r for r in rows if r["page"] in vp]; te = [r for r in rows if r["page"] in test_pages]
     assert not ({r["page"] for r in tr + va} & test_pages)
     fck = dict(ck, name=f"fold-{fold}", curves=str(Path(ck["curves"]) / f"fold-{fold}.json")) if ck else None
@@ -128,7 +167,11 @@ def main():
     ap.add_argument("--settings", default=None, help="JSON file: {\"preset\": ..., \"hp\": {every training value}, \"arch\": a preset name or an architecture spec (htr.normalize)}; see settings.py")
     ap.add_argument("--card", default=cards.LEGACY); ap.add_argument("--pretrained", default="auto", help="starting weights: auto (studio/pretrained/DEFAULT, else legacy), legacy, or a name from pretrained.py list"); ap.add_argument("--max-epochs", type=int, default=300, help="cap per CV fold (lower only for a quick trial)")
     ap.add_argument("--resume", action="store_true", help="continue a stopped or failed run from RUN_DIR/checkpoints (RUN_DIR/trainer_args.json holds everything else; no other option may be given)")
+    ap.add_argument("--val-frac", type=float, default=None, help="with --test-frac: one fixed train/validation/test split by writer instead of 5-fold cross-validation (the fraction of writers used for early stopping)")
+    ap.add_argument("--test-frac", type=float, default=None, help="with --val-frac: the fraction of writers held out as the test part, scored once by a model that never saw them")
     a = ap.parse_args(); run = Path(a.run_dir); settings_raw = None
+    if (a.val_frac is None) != (a.test_frac is None): ap.error("--val-frac and --test-frac go together: give both for a fixed split, neither for 5-fold cross-validation")
+    if a.val_frac is not None and not (0.05 <= a.val_frac <= 0.5 and 0.05 <= a.test_frac <= 0.5 and a.val_frac + a.test_frac <= 0.6): ap.error("--val-frac and --test-frac must each be 0.05 to 0.5, and together at most 0.6")
     if a.resume:
         clash = sorted(k for k, v in vars(a).items() if k not in ("run_dir", "resume") and v != ap.get_default(k))
         if clash: ap.error(f"--resume takes only RUN_DIR: the settings come from trainer_args.json (also given: {', '.join('--' + k.replace('_', '-') for k in clash)})")
@@ -136,6 +179,7 @@ def main():
         saved = json.loads((run / "trainer_args.json").read_text()); settings_raw = saved.get("settings_raw")
         for k, v in saved["args"].items(): setattr(a, k, v)
         a.resume = True; (run / "STOP").unlink(missing_ok=True)          # the STOP that ended the last run must not end this one
+    fixed = a.val_frac is not None          # after the resume block: a resumed run takes its split mode from trainer_args.json
     run.mkdir(parents=True, exist_ok=True); t0 = time.time(); fold_epochs = {}
     def status(stage, detail="", **kw):
         if "resumable" not in kw and stage == "error": kw["resumable"] = any((run / "checkpoints").glob("*.pt"))
@@ -162,13 +206,26 @@ def main():
         pages = sorted({r["page"] for r in rows})
         if len(pages) < cards.MIN_PAGES: raise ValueError(f"{len(rows)} labeled cells on {len(pages)} page(s): training needs at least {cards.MIN_PAGES} labeled pages")
         units, unit, n_units = cards.split_units(a.card, pages)
-        if len(pages) < 5 or n_units < 5: raise ValueError(f"{n_units} {unit}(s): 5-fold cross-validation needs at least 5")
-        folds = make_folds(rows, units=units)
-        assert sorted(sum(folds, [])) == pages and all(not set(folds[i]) & set(folds[j]) for i in range(5) for j in range(i))
-        assert all(len({units[p] for p in f} & {units[p] for g in folds if g is not f for p in g}) == 0 for f in folds), "a writer appears in two folds"
-        split_bytes = json.dumps({"seed": SEED, "unit": unit, "folds": folds}, sort_keys=True).encode()
+        val_pages, split_rec = None, {}
+        if fixed:
+            if n_units < 3: raise ValueError(f"{n_units} {unit}(s): a fixed train/validation/test split needs at least 3")
+            train_pages, val_pages, test_pages = make_split(rows, a.val_frac, a.test_frac, units=units); folds = [test_pages]
+            parts = (train_pages, val_pages, test_pages)
+            assert sorted(sum(parts, [])) == pages and all(not set(parts[i]) & set(parts[j]) for i in range(3) for j in range(i))
+            assert all(not {units[p] for p in parts[i]} & {units[p] for p in parts[j]} for i in range(3) for j in range(i)), "a writer appears in two parts"
+            split_rec = {"mode": "fixed", "val_frac": a.val_frac, "test_frac": a.test_frac, "pages": {"train": len(train_pages), "val": len(val_pages), "test": len(test_pages)}}
+            split_bytes = json.dumps({"seed": SEED, "unit": unit, "folds": folds, "mode": "fixed", "val": val_pages, "train": train_pages, "val_frac": a.val_frac, "test_frac": a.test_frac}, sort_keys=True).encode()
+        else:
+            if len(pages) < 5 or n_units < 5: raise ValueError(f"{n_units} {unit}(s): 5-fold cross-validation needs at least 5")
+            folds = make_folds(rows, units=units)
+            assert sorted(sum(folds, [])) == pages and all(not set(folds[i]) & set(folds[j]) for i in range(5) for j in range(i))
+            assert all(len({units[p] for p in f} & {units[p] for g in folds if g is not f for p in g}) == 0 for f in folds), "a writer appears in two folds"
+            split_bytes = json.dumps({"seed": SEED, "unit": unit, "folds": folds}, sort_keys=True).encode()
+        K = len(folds)          # 5 for cross-validation, 1 for a fixed split (its one "fold" is the test part)
         (run / "folds.json").write_bytes(split_bytes)
-        status("cv", f"{len(rows)} labeled cells, {len(pages)} pages; 0 of 5 folds done", cv_done=0)
+        test_set = set(sum(folds, [])) if fixed else None
+        with open(merged, newline="") as fh: n_expect = sum(1 for r in csv.DictReader(fh) if r["page"] in test_set) if fixed else n_train
+        status("cv", f"{len(rows)} labeled cells, {len(pages)} pages; 0 of {K} folds done" if not fixed else f"{len(rows)} labeled cells, {len(pages)} pages; fixed split: {len(train_pages)} train, {len(val_pages)} validation, {len(test_pages)} test pages", cv_done=0)
         preds, bests, curves = [], [], []; gspec = grammar_spec(a.card); stopped_folds = []
         ck = dict(dir=str(run / "checkpoints"), every=ck_run["checkpoint_every"], keep_last=ck_run["keep_last"], stop=str(run / "STOP"), curves=str(run / "curves"), done=str(run / "folds_done"), resume=a.resume)
         def read_epochs(fs):
@@ -179,33 +236,33 @@ def main():
             if out is None: stopped_folds.append(fold); return
             preds.extend(out); bests.append(best); curves.append({"fold": fold, "best_epoch": best, "history": hist})
         todo = []
-        for f in range(5):
+        for f in range(K):
             dn = run / "folds_done" / f"fold-{f}.json"
             if a.resume and dn.exists(): d = json.loads(dn.read_text()); finish(d["fold"], d["out"], d["best"], d["hist"]); read_epochs([f])
             else: todo.append(f)
-        status("cv", f"{len(rows)} labeled cells, {len(pages)} pages; {len(bests)} of 5 folds done", cv_done=len(bests))
+        status("cv", f"{len(rows)} labeled cells, {len(pages)} pages; {len(bests)} of {K} folds done", cv_done=len(bests))
         if todo:
-            with Pool(5) as pool:
-                pending = {f: pool.apply_async(cv_job, ((f, folds, str(merged), a.card, a.max_epochs, gspec, str(weights) if weights else None, cfg, arch, a.seed, ck),)) for f in todo}
+            with Pool(min(K, 5)) as pool:
+                pending = {f: pool.apply_async(cv_job, ((f, folds, str(merged), a.card, a.max_epochs, gspec, str(weights) if weights else None, cfg, arch, a.seed, ck, val_pages),)) for f in todo}
                 while pending:
                     for f, r in list(pending.items()):
                         if r.ready(): finish(*r.get()); read_epochs([f]); del pending[f]
-                    read_epochs(pending); status("cv", f"{len(bests)} of 5 folds done", cv_done=len(bests))
+                    read_epochs(pending); status("cv", f"{len(bests)} of {K} folds done", cv_done=len(bests))
                     if pending: next(iter(pending.values())).wait(2)
         if stopped_folds:
-            status("stopped", f"stopped during cross-validation: {len(bests)} of 5 folds finished, folds {sorted(stopped_folds)} saved at epochs " + ", ".join(f"{f}: {fold_epochs.get(str(f), '?')}" for f in sorted(stopped_folds)) + "; resume with --resume", cv_done=len(bests), resumable=True)
+            status("stopped", f"stopped during cross-validation: {len(bests)} of {K} folds finished, folds {sorted(stopped_folds)} saved at epochs " + ", ".join(f"{f}: {fold_epochs.get(str(f), '?')}" for f in sorted(stopped_folds)) + "; resume with --resume", cv_done=len(bests), resumable=True)
             return
-        assert len(preds) == n_train and len({(p["page"], p["row"], p["col"]) for p in preds}) == n_train
+        assert len(preds) == n_expect and len({(p["page"], p["row"], p["col"]) for p in preds}) == n_expect
         parts_preds = preds; preds = subcells.compose(preds, layouts, whole) if layouts else preds       # two-line cells are scored as whole cells
-        assert len(preds) == len(rows) or layouts, "every labeled cell must have exactly one cross-validation read"
+        assert len(preds) == (sum(1 for r in rows if r["page"] in test_set) if fixed else len(rows)) or layouts, "every labeled cell must have exactly one cross-validation read"
         cv = metrics(preds); overall = metrics([dict(p, row="ALL") for p in preds])["ALL"]
         epochs = int(statistics.median(bests))
         if a.cv_only:
             json.dump(preds, open(run / "cv_predictions.json", "w"))
-            json.dump(dict(card=a.card, cv_only=True, seed=a.seed, settings=sett["record"], early_stopping=early, checkpoints=ck_rec, cv_all=overall, best_epochs=sorted(bests), n_cells=len(rows), n_pages=len(pages), split_unit=unit, minutes=round((time.time() - t0) / 60, 1),
+            json.dump(dict(card=a.card, cv_only=True, seed=a.seed, settings=sett["record"], early_stopping=early, checkpoints=ck_rec, cv_all=overall, best_epochs=sorted(bests), n_cells=len(rows), n_pages=len(pages), split_unit=unit, **({"split": split_rec} if fixed else {}), minutes=round((time.time() - t0) / 60, 1),
                            fields=[dict(field=k, **v) for k, v in sorted(cv.items(), key=lambda kv: -kv[1]["n"])]), open(run / "results.json", "w"), indent=1)
             status("done", "cross-validation only: no final reader and no pack"); return
-        status("final", f"training the reader on all {len(pages)} pages for {epochs} epochs (median best epoch of the folds)", cv_done=5)
+        status("final", f"training the reader on all {len(pages)} pages for {epochs} epochs (median best epoch of the folds)", cv_done=K)
         import torch, common as C, train as T
         C.use_fields(cards.masks(a.card))
         pre = torch.load(weights) if weights else None
@@ -213,7 +270,7 @@ def main():
         if model is None:
             try: fe = len(json.loads((run / "curves" / "final.json").read_text()))
             except (OSError, ValueError): fe = "?"
-            status("stopped", f"stopped during the final training at epoch {fe} of {epochs}; resume with --resume", cv_done=5, resumable=True); return
+            status("stopped", f"stopped during the final training at epoch {fe} of {epochs}; resume with --resume", cv_done=K, resumable=True); return
         model.eval()
         status("export", "ONNX export and parity check")
         import numpy as np, onnxruntime as ort
@@ -261,7 +318,7 @@ def main():
             man["preprocess"]["normalize"] = {"default": "contrast_match", "reference": {"mean": mean, "std": std, "source": f"gray mean/std over {len(scans)} aligned scans the reader was trained on"}}
         else:
             man["preprocess"]["normalize"] = {"default": "flatten"}
-        man["metrics"] = {"heldout": {"method": "pooled 5-fold CV by page of the same recipe; every labeled cell predicted once by a model that never saw its page",
+        man["metrics"] = {"heldout": {"method": (f"fixed split by {unit}: {a.test_frac:.0%} of {unit}s held out as the test part; every test cell predicted by a model that never saw its {unit} (the shipped reader is then trained on all pages)" if fixed else "pooled 5-fold CV by page of the same recipe; every labeled cell predicted once by a model that never saw its page"),
                                       "split_unit": f"writer ({n_units} writers)" if unit == "writer" else "page (writer unknown)", "split_file_sha256": hashlib.sha256(split_bytes).hexdigest(),
                                       "reader_trained_on": f"all {len(pages)} labeled pages for {epochs} epochs (the shipped weights have no held-out number of their own)",
                                       "gate": {"target_lower_bound_pct": a.target, "min_n": a.min_n},
@@ -274,7 +331,7 @@ def main():
         errs = cp.validate(out_pack)
         crops_note = "stored gray crops (work/crops) or imported crops" if a.card == cards.LEGACY else f"stored gray crops (studio/cards/{a.card}/crops) or imported crops"
         overall_greedy = overall; overall = metrics([dict(p, row="ALL", pred=p["pred_grammar"] if dec.get(p["row"], {}).get("decode") == "grammar" else p["pred"]) for p in preds])["ALL"]
-        res = dict(card=a.card, pretrained={"name": wrec["name"], "sha256": pretrained.sha256(weights)[:16] if weights else None, "images": wrec.get("images"), "epochs": wrec.get("epochs"), "generator": wrec.get("generator")}, cv_all_greedy=overall_greedy, decode=dec, split_unit=unit, split_units=n_units, dropped_labels=dropped, config=a.config, settings=sett["record"], early_stopping=early, checkpoints=ck_rec, target=a.target, min_n=a.min_n, n_cells=len(rows), n_pages=len(pages), folds=[len(f) for f in folds], best_epochs=sorted(bests),
+        res = dict(card=a.card, pretrained={"name": wrec["name"], "sha256": pretrained.sha256(weights)[:16] if weights else None, "images": wrec.get("images"), "epochs": wrec.get("epochs"), "generator": wrec.get("generator")}, cv_all_greedy=overall_greedy, decode=dec, split_unit=unit, split_units=n_units, dropped_labels=dropped, config=a.config, settings=sett["record"], early_stopping=early, checkpoints=ck_rec, target=a.target, min_n=a.min_n, n_cells=len(rows), n_pages=len(pages), folds=[len(f) for f in folds], **({"split": split_rec} if fixed else {}), best_epochs=sorted(bests),
                    final_epochs=epochs, cv_all=overall, parity=parity, tflite=tfl, minutes=round((time.time() - t0) / 60, 1),
                    fields=[dict(field=k, **v, decode=dec.get(k, {}).get("decode", "greedy"), status=gate.get(k, ("needs-review", ""))[0], reason=gate.get(k, ("", ""))[1]) for k, v in sorted(cv.items(), key=lambda kv: -kv[1]["n"])],
                    unlabeled_fields=[f["key"] for f in fld["fields"] if f["key"] not in cv],
