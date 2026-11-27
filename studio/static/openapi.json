@@ -1,0 +1,3109 @@
+{
+ "openapi": "3.0.3",
+ "info": {
+  "title": "Card Studio local API",
+  "version": "1",
+  "description": "Local only (127.0.0.1). Generated from studio/server.py by tools/gen_openapi.py; request and response bodies are not modelled. Cross-site requests are refused, so use this page from the studio's own origin."
+ },
+ "paths": {
+  "/api/analyze": {
+   "post": {
+    "tags": [
+     "analyze"
+    ],
+    "summary": "POST /api/analyze",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/arch/catalog": {
+   "post": {
+    "tags": [
+     "arch"
+    ],
+    "summary": "POST /api/arch/catalog",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/arch/check": {
+   "post": {
+    "tags": [
+     "arch"
+    ],
+    "summary": "POST /api/arch/check",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/arch/compat": {
+   "post": {
+    "tags": [
+     "arch"
+    ],
+    "summary": "POST /api/arch/compat",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/arch/custom": {
+   "get": {
+    "tags": [
+     "arch"
+    ],
+    "summary": "GET /api/arch/custom",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/arch/describe": {
+   "post": {
+    "tags": [
+     "arch"
+    ],
+    "summary": "POST /api/arch/describe",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/card/{card}/checklist": {
+   "get": {
+    "tags": [
+     "card"
+    ],
+    "summary": "GET /api/card/{card}/checklist",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/card/{card}/crop/{name}/{col}/{name_}.png": {
+   "get": {
+    "tags": [
+     "card"
+    ],
+    "summary": "GET /api/card/{card}/crop/{name}/{col}/{name_}.png",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "col",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "name_",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "image/png": {
+        "schema": {
+         "type": "string",
+         "format": "binary"
+        }
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/card/{card}/datasize": {
+   "get": {
+    "tags": [
+     "card"
+    ],
+    "summary": "GET /api/card/{card}/datasize",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/card/{card}/datasize/curve": {
+   "post": {
+    "tags": [
+     "card"
+    ],
+    "summary": "POST /api/card/{card}/datasize/curve",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/card/{card}/field": {
+   "post": {
+    "tags": [
+     "card"
+    ],
+    "summary": "POST /api/card/{card}/field",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/card/{card}/label": {
+   "post": {
+    "tags": [
+     "card"
+    ],
+    "summary": "POST /api/card/{card}/label",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/card/{card}/label/clear": {
+   "post": {
+    "tags": [
+     "card"
+    ],
+    "summary": "POST /api/card/{card}/label/clear",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/card/{card}/labeling": {
+   "get": {
+    "tags": [
+     "card"
+    ],
+    "summary": "GET /api/card/{card}/labeling",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/card/{card}/labeling/queue": {
+   "get": {
+    "tags": [
+     "card"
+    ],
+    "summary": "GET /api/card/{card}/labeling/queue",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/card/{card}/labelstudio/pull": {
+   "post": {
+    "tags": [
+     "card"
+    ],
+    "summary": "POST /api/card/{card}/labelstudio/pull",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/card/{card}/labelstudio/push": {
+   "post": {
+    "tags": [
+     "card"
+    ],
+    "summary": "POST /api/card/{card}/labelstudio/push",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/card/{card}/recut": {
+   "post": {
+    "tags": [
+     "card"
+    ],
+    "summary": "POST /api/card/{card}/recut",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/card/{card}/review": {
+   "get": {
+    "tags": [
+     "card"
+    ],
+    "summary": "GET /api/card/{card}/review",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/card/{card}/review/migrate": {
+   "post": {
+    "tags": [
+     "card"
+    ],
+    "summary": "POST /api/card/{card}/review/migrate",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/card/{card}/review/set": {
+   "post": {
+    "tags": [
+     "card"
+    ],
+    "summary": "POST /api/card/{card}/review/set",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/card/{card}/scan/{name}.png": {
+   "get": {
+    "tags": [
+     "card"
+    ],
+    "summary": "GET /api/card/{card}/scan/{name}.png",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "image/png": {
+        "schema": {
+         "type": "string",
+         "format": "binary"
+        }
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/card/{card}/scan/delete": {
+   "post": {
+    "tags": [
+     "card"
+    ],
+    "summary": "POST /api/card/{card}/scan/delete",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/card/{card}/seedexp": {
+   "get": {
+    "tags": [
+     "card"
+    ],
+    "summary": "GET /api/card/{card}/seedexp",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/card/{card}/seedexp/compare": {
+   "get": {
+    "tags": [
+     "card"
+    ],
+    "summary": "GET /api/card/{card}/seedexp/compare",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/card/{card}/seedexp/run": {
+   "post": {
+    "tags": [
+     "card"
+    ],
+    "summary": "POST /api/card/{card}/seedexp/run",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/card/{card}/split/preview": {
+   "get": {
+    "tags": [
+     "card"
+    ],
+    "summary": "GET /api/card/{card}/split/preview",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/card/{card}/suggest": {
+   "post": {
+    "tags": [
+     "card"
+    ],
+    "summary": "POST /api/card/{card}/suggest",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/card/{card}/testset": {
+   "get": {
+    "tags": [
+     "card"
+    ],
+    "summary": "GET /api/card/{card}/testset",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/card/{card}/testset/reserve": {
+   "post": {
+    "tags": [
+     "card"
+    ],
+    "summary": "POST /api/card/{card}/testset/reserve",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/card/{card}/testset/score": {
+   "post": {
+    "tags": [
+     "card"
+    ],
+    "summary": "POST /api/card/{card}/testset/score",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/card/{card}/writers": {
+   "get": {
+    "tags": [
+     "card"
+    ],
+    "summary": "GET /api/card/{card}/writers",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "card"
+    ],
+    "summary": "POST /api/card/{card}/writers",
+    "parameters": [
+     {
+      "name": "card",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/cards": {
+   "get": {
+    "tags": [
+     "cards"
+    ],
+    "summary": "GET /api/cards",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/cleanup": {
+   "post": {
+    "tags": [
+     "cleanup"
+    ],
+    "summary": "POST /api/cleanup",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/cleanup/{id}/{name}.png": {
+   "get": {
+    "tags": [
+     "cleanup"
+    ],
+    "summary": "GET /api/cleanup/{id}/{name}.png",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "image/png": {
+        "schema": {
+         "type": "string",
+         "format": "binary"
+        }
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/cleanup/packs": {
+   "get": {
+    "tags": [
+     "cleanup"
+    ],
+    "summary": "GET /api/cleanup/packs",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/compare/paired": {
+   "get": {
+    "tags": [
+     "compare"
+    ],
+    "summary": "GET /api/compare/paired",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/crop/{name}/{name_}/{col}.png": {
+   "get": {
+    "tags": [
+     "crop"
+    ],
+    "summary": "GET /api/crop/{name}/{name_}/{col}.png",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "name_",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "col",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "image/png": {
+        "schema": {
+         "type": "string",
+         "format": "binary"
+        }
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/crop/{name}": {
+   "get": {
+    "tags": [
+     "crop"
+    ],
+    "summary": "GET /api/crop/{name}",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/datasets": {
+   "get": {
+    "tags": [
+     "datasets"
+    ],
+    "summary": "GET /api/datasets",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/errors": {
+   "get": {
+    "tags": [
+     "errors"
+    ],
+    "summary": "GET /api/errors",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/experiments": {
+   "get": {
+    "tags": [
+     "experiments"
+    ],
+    "summary": "GET /api/experiments",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/experiments/{name}": {
+   "get": {
+    "tags": [
+     "experiments"
+    ],
+    "summary": "GET /api/experiments/{name}",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/export/bench": {
+   "post": {
+    "tags": [
+     "export"
+    ],
+    "summary": "POST /api/export/bench",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/external": {
+   "get": {
+    "tags": [
+     "external"
+    ],
+    "summary": "GET /api/external",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/external/{name}/benchmark": {
+   "post": {
+    "tags": [
+     "external"
+    ],
+    "summary": "POST /api/external/{name}/benchmark",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/external/{name}/remove": {
+   "post": {
+    "tags": [
+     "external"
+    ],
+    "summary": "POST /api/external/{name}/remove",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/external/{name}/suggest": {
+   "post": {
+    "tags": [
+     "external"
+    ],
+    "summary": "POST /api/external/{name}/suggest",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/external/hf": {
+   "get": {
+    "tags": [
+     "external"
+    ],
+    "summary": "GET /api/external/hf",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/external/import": {
+   "post": {
+    "tags": [
+     "external"
+    ],
+    "summary": "POST /api/external/import",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/idtest": {
+   "get": {
+    "tags": [
+     "idtest"
+    ],
+    "summary": "GET /api/idtest",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/import/corrections": {
+   "post": {
+    "tags": [
+     "import"
+    ],
+    "summary": "POST /api/import/corrections",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/import/label-studio": {
+   "post": {
+    "tags": [
+     "import"
+    ],
+    "summary": "POST /api/import/label-studio",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/import/summary": {
+   "get": {
+    "tags": [
+     "import"
+    ],
+    "summary": "GET /api/import/summary",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/jobs": {
+   "get": {
+    "tags": [
+     "jobs"
+    ],
+    "summary": "GET /api/jobs",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/labels/summary": {
+   "get": {
+    "tags": [
+     "labels"
+    ],
+    "summary": "GET /api/labels/summary",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/labelstudio": {
+   "get": {
+    "tags": [
+     "labelstudio"
+    ],
+    "summary": "GET /api/labelstudio",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/ml": {
+   "get": {
+    "tags": [
+     "ml"
+    ],
+    "summary": "GET /api/ml",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/ml/calibration": {
+   "get": {
+    "tags": [
+     "ml"
+    ],
+    "summary": "GET /api/ml/calibration",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/ml/curves": {
+   "get": {
+    "tags": [
+     "ml"
+    ],
+    "summary": "GET /api/ml/curves",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/ml/overview": {
+   "get": {
+    "tags": [
+     "ml"
+    ],
+    "summary": "GET /api/ml/overview",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/ml/policy": {
+   "get": {
+    "tags": [
+     "ml"
+    ],
+    "summary": "GET /api/ml/policy",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/ml/provenance": {
+   "get": {
+    "tags": [
+     "ml"
+    ],
+    "summary": "GET /api/ml/provenance",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/pack/{pack}/detail": {
+   "get": {
+    "tags": [
+     "pack"
+    ],
+    "summary": "GET /api/pack/{pack}/detail",
+    "parameters": [
+     {
+      "name": "pack",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/pack/{pack}/download": {
+   "get": {
+    "tags": [
+     "pack"
+    ],
+    "summary": "GET /api/pack/{pack}/download",
+    "parameters": [
+     {
+      "name": "pack",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/octet-stream": {
+        "schema": {
+         "type": "string",
+         "format": "binary"
+        }
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/pack/{pack}/reader.tflite": {
+   "get": {
+    "tags": [
+     "pack"
+    ],
+    "summary": "GET /api/pack/{pack}/reader.tflite",
+    "parameters": [
+     {
+      "name": "pack",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/octet-stream": {
+        "schema": {
+         "type": "string",
+         "format": "binary"
+        }
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/pack/{pack}/template": {
+   "get": {
+    "tags": [
+     "pack"
+    ],
+    "summary": "GET /api/pack/{pack}/template",
+    "parameters": [
+     {
+      "name": "pack",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/pack/{pack}/tflite": {
+   "post": {
+    "tags": [
+     "pack"
+    ],
+    "summary": "POST /api/pack/{pack}/tflite",
+    "parameters": [
+     {
+      "name": "pack",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/pack/import": {
+   "post": {
+    "tags": [
+     "pack"
+    ],
+    "summary": "POST /api/pack/import",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/packs": {
+   "get": {
+    "tags": [
+     "packs"
+    ],
+    "summary": "GET /api/packs",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/playground/options": {
+   "get": {
+    "tags": [
+     "playground"
+    ],
+    "summary": "GET /api/playground/options",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/pretrain": {
+   "post": {
+    "tags": [
+     "pretrain"
+    ],
+    "summary": "POST /api/pretrain",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/pretrain/status": {
+   "get": {
+    "tags": [
+     "pretrain"
+    ],
+    "summary": "GET /api/pretrain/status",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/pretrained": {
+   "get": {
+    "tags": [
+     "pretrained"
+    ],
+    "summary": "GET /api/pretrained",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/run/{run}/download/{file}": {
+   "get": {
+    "tags": [
+     "run"
+    ],
+    "summary": "GET /api/run/{run}/download/{file}",
+    "parameters": [
+     {
+      "name": "run",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "file",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/octet-stream": {
+        "schema": {
+         "type": "string",
+         "format": "binary"
+        }
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/run/{run}/log": {
+   "get": {
+    "tags": [
+     "run"
+    ],
+    "summary": "GET /api/run/{run}/log",
+    "parameters": [
+     {
+      "name": "run",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/run/{run}/curves": {
+   "get": {
+    "tags": [
+     "run"
+    ],
+    "summary": "GET /api/run/{run}/curves",
+    "parameters": [
+     {
+      "name": "run",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/runs": {
+   "get": {
+    "tags": [
+     "runs"
+    ],
+    "summary": "GET /api/runs",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/runs/compare": {
+   "get": {
+    "tags": [
+     "runs"
+    ],
+    "summary": "GET /api/runs/compare",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/runs/table": {
+   "get": {
+    "tags": [
+     "runs"
+    ],
+    "summary": "GET /api/runs/table",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/save": {
+   "post": {
+    "tags": [
+     "save"
+    ],
+    "summary": "POST /api/save",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/scans": {
+   "get": {
+    "tags": [
+     "scans"
+    ],
+    "summary": "GET /api/scans",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "scans"
+    ],
+    "summary": "POST /api/scans",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/template/{template}/{version}/download": {
+   "get": {
+    "tags": [
+     "template"
+    ],
+    "summary": "GET /api/template/{template}/{version}/download",
+    "parameters": [
+     {
+      "name": "template",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "version",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/octet-stream": {
+        "schema": {
+         "type": "string",
+         "format": "binary"
+        }
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/template/{template}/{version}/grid": {
+   "get": {
+    "tags": [
+     "template"
+    ],
+    "summary": "GET /api/template/{template}/{version}/grid",
+    "parameters": [
+     {
+      "name": "template",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "version",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/template/{template}/{version}/image": {
+   "get": {
+    "tags": [
+     "template"
+    ],
+    "summary": "GET /api/template/{template}/{version}/image",
+    "parameters": [
+     {
+      "name": "template",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "version",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/template/{template}/{version}/layout": {
+   "get": {
+    "tags": [
+     "template"
+    ],
+    "summary": "GET /api/template/{template}/{version}/layout",
+    "parameters": [
+     {
+      "name": "template",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "version",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/template/grid": {
+   "post": {
+    "tags": [
+     "template"
+    ],
+    "summary": "POST /api/template/grid",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/templates": {
+   "get": {
+    "tags": [
+     "templates"
+    ],
+    "summary": "GET /api/templates",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/train/pause": {
+   "post": {
+    "tags": [
+     "train"
+    ],
+    "summary": "POST /api/train/pause",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/train/resume": {
+   "post": {
+    "tags": [
+     "train"
+    ],
+    "summary": "POST /api/train/resume",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/train/settings": {
+   "get": {
+    "tags": [
+     "train"
+    ],
+    "summary": "GET /api/train/settings",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/train/settings/check": {
+   "post": {
+    "tags": [
+     "train"
+    ],
+    "summary": "POST /api/train/settings/check",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/train/start": {
+   "post": {
+    "tags": [
+     "train"
+    ],
+    "summary": "POST /api/train/start",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/train/status": {
+   "get": {
+    "tags": [
+     "train"
+    ],
+    "summary": "GET /api/train/status",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/train/stop": {
+   "post": {
+    "tags": [
+     "train"
+    ],
+    "summary": "POST /api/train/stop",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/train/unpause": {
+   "post": {
+    "tags": [
+     "train"
+    ],
+    "summary": "POST /api/train/unpause",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    },
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/training": {
+   "get": {
+    "tags": [
+     "training"
+    ],
+    "summary": "GET /api/training",
+    "parameters": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  },
+  "/api/upload/{id}/image": {
+   "get": {
+    "tags": [
+     "upload"
+    ],
+    "summary": "GET /api/upload/{id}/image",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "4XX": {
+      "description": "Refused or invalid: {\"error\": message}"
+     }
+    }
+   }
+  }
+ }
+}

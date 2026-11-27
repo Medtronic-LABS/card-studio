@@ -11,11 +11,11 @@ from pathlib import Path
 
 TEXT_EXT = {".py", ".md", ".html", ".css", ".js", ".txt", ".yml", ".yaml", ".toml", ".cfg", ".dart"}
 NAMES_OK = {".gitignore", "LICENSE", "NOTICE", "requirements.txt"}
-JSON_OK = ["cardpack/schema/*.json", "cardpack/reference/grammar_vectors.json", "model_meta.json", "docs/screenshots/MANIFEST.json", "docs/status.json"]
+JSON_OK = ["cardpack/schema/*.json", "cardpack/reference/grammar_vectors.json", "model_meta.json", "docs/screenshots/MANIFEST.json", "docs/status.json", "studio/static/openapi.json"]
 DENY_EXT = {".onnx", ".tflite", ".pt", ".pth", ".ckpt", ".cardpack", ".csv", ".tsv", ".pdf", ".ipynb", ".npy", ".npz", ".h5", ".hdf5", ".zip", ".gz", ".tar", ".jpg", ".jpeg",
             ".gif", ".bmp", ".tif", ".tiff", ".heic", ".webp", ".db", ".sqlite", ".pkl", ".pickle", ".log", ".docx", ".xlsx", ".mp4", ".mov"}
 DENY_DIRS = {"work", "data", "runs", "uploads", "templates", "imports", "experiments", "out", "crops", "aligned", "raw", "cards", "curves", "pretrained", "capacity", "datasets"}
-SKIP_CONTENT = {"studio/static/vendor/tabler.min.css"}          # vendored third-party CSS: allowed, not scanned
+SKIP_CONTENT = {"studio/static/vendor/tabler.min.css", "studio/static/vendor/swagger-ui.css", "studio/static/vendor/swagger-ui-bundle.js"}   # vendored third-party: allowed, not scanned or size-limited
 MAX_BYTES = 700_000
 PATTERNS = [
     (re.compile(r"/Users/[A-Za-z0-9_.-]+"), "absolute home path"), (re.compile(r"/home/[a-z][a-z0-9_-]+/"), "absolute home path"),
@@ -45,7 +45,7 @@ def check(root):
         if rel.startswith("htr/data/"): bad_dir -= {"data"}     # htr/data is code (dataset engineering modules), not a data directory; the actual dataset root is bengali_dataset/
         if bad_dir: out.append(f"{rel}: inside a data directory ({', '.join(sorted(bad_dir))})"); continue
         if ext in DENY_EXT: out.append(f"{rel}: file type {ext} is never allowed (images, models, packs, labels, notebooks, PDFs)"); continue
-        if p.stat().st_size > MAX_BYTES: out.append(f"{rel}: {p.stat().st_size} bytes is over the {MAX_BYTES} limit"); continue
+        if rel not in SKIP_CONTENT and p.stat().st_size > MAX_BYTES: out.append(f"{rel}: {p.stat().st_size} bytes is over the {MAX_BYTES} limit"); continue
         if ext == ".png":
             e = shots.get(rel)
             if not rel.startswith("docs/screenshots/") or e is None: out.append(f"{rel}: a PNG that is not a registered UI screenshot")

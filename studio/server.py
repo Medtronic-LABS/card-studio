@@ -15,7 +15,8 @@ from urllib.parse import parse_qs, urlparse
 HERE = Path(__file__).resolve().parent
 TEMPLATES, UPLOADS = HERE / "templates", HERE / "uploads"
 NAME = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
-VENDOR = {"/vendor/tabler.min.css", "/vendor/TABLER-LICENSE.txt", "/vendor/pico.min.css", "/vendor/PICO-LICENSE.md"}   # vendored, MIT; no CDN
+VENDOR = {"/vendor/tabler.min.css", "/vendor/TABLER-LICENSE.txt", "/vendor/pico.min.css", "/vendor/PICO-LICENSE.md",
+          "/vendor/swagger-ui.css", "/vendor/swagger-ui-bundle.js", "/vendor/SWAGGER-UI-LICENSE.txt"}   # vendored, MIT; no CDN
 HIGH, MID = 0.67, 0.25
 MAX_BODY = 40 * 1024 * 1024      # a phone photo or PDF; anything bigger is refused before it is read
 UPLOAD_TTL = 24 * 3600           # uploaded photos are patient data: deleted after a day
@@ -429,7 +430,9 @@ class H(BaseHTTPRequestHandler):
         p = self.path.split("?")[0]
         if p == "/": return self._send(200, (HERE / "static" / "index.html").read_bytes(), "text/html; charset=utf-8")
         if p in VENDOR:
-            return self._send(200, (HERE / "static" / p[1:]).read_bytes(), "text/css" if p.endswith(".css") else "text/plain")
+            return self._send(200, (HERE / "static" / p[1:]).read_bytes(), "text/css" if p.endswith(".css") else "text/javascript" if p.endswith(".js") else "text/plain")
+        if p == "/openapi.json": return self._send(200, (HERE / "static" / "openapi.json").read_bytes())
+        if p == "/api/docs": return self._send(200, (HERE / "static" / "docs.html").read_bytes(), "text/html; charset=utf-8")
         if p.startswith("/js/") and p.endswith(".js") and NAME.match(p[4:-3]):
             f = HERE / "static" / "js" / p[4:]
             if f.exists(): return self._send(200, f.read_bytes(), "text/javascript")

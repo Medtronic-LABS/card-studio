@@ -110,6 +110,10 @@ python -m unittest discover -s tools                           # leak check
 python tools/leakcheck.py .                                    # nothing patient-like in this tree
 ```
 
+## API docs (Swagger)
+
+With the studio running, open `/api/docs` (for example http://127.0.0.1:8793/api/docs) for a Swagger UI of every `/api/...` route, or `/openapi.json` for the spec. Swagger UI is vendored (Apache-2.0), so it works offline and nothing leaves the machine. The spec lists routes and path parameters but does not model request or response bodies. It is generated from `studio/server.py`: after adding a route run `python tools/gen_openapi.py` (a test fails if it is stale).
+
 ## Layout
 
 ```
