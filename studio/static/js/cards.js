@@ -149,10 +149,11 @@ async function loadPacks(){const [packs,tpls,runs,lab]=await Promise.all([api('/
   [runs.some(r=>r.state==='done'),'Train a reader',`${runs.length} run${runs.length===1?'':'s'}`,['Train & ship',"tab('train')"]],
   [!!best&&best.ship>0,'Get a field to ship',best?`${best.ship} of ${best.fields} fields (${esc(best.id)} v${best.version})`:'no pack yet',['Train & ship',"tab('train')"]],
   [gaps===0,'Give every field enough held-out cells',gaps==null?'':`${gaps} field${gaps===1?'':'s'} still under ${minN} cells`,['Label',"tab('label')"]],
-  [tfl>0,'Have a pack with a TensorFlow Lite reader',`${tfl} pack version${tfl===1?'':'s'}`,['Model registry',"document.getElementById('packs').scrollIntoView({behavior:'smooth'})"]],
+  [tfl>0,'Have a pack with a TensorFlow Lite reader',`${tfl} pack version${tfl===1?'':'s'}`,['Model registry',"tab('cards');setTimeout(()=>document.getElementById('packs').scrollIntoView({behavior:'smooth'}),250)"]],
   [runs.filter(r=>r.state==='done').length>=2,'Compare two runs',`${runs.filter(r=>r.state==='done').length} finished run(s)`,['History',"tab('history')"]],
   [imp>0,'Import phone corrections',imp?`${imp} imported`:'none yet',['Label',"tab('label')"]]];
  const done=steps.filter(x=>x[0]).length;$('chkn').textContent=`${done} of ${steps.length}`;$('chkb').style.width=(100*done/steps.length)+'%';
+ {const nx=steps.find(x=>!x[0]);$('nxn').textContent=`${done} of ${steps.length}`;$('nxb').style.width=(100*done/steps.length)+'%';$('nxt').innerHTML=nx?`<b>${esc(nx[1])}</b><div>${nx[2]} · <a onclick="${nx[3][1]}">${nx[3][0]} &rarr;</a></div>`:'Every step is done.'}
  $('chk').innerHTML=steps.map(([d,t,sub,a])=>`<li class="${d?'done':''}"><i>${d?'&#10003;':''}</i><div><b>${esc(t)}</b><div class="tag">${sub}${d?'':` · <a onclick="${a[1]}">${a[0]} &rarr;</a>`}</div></div></li>`).join('');
  // activity feed from real timestamps
  const ev=[];runs.forEach(r=>ev.push({ts:r.ts,kind:'run',t:`Training run <b>${esc(r.name)}</b> ${esc(r.state)}`,sub:r.exact!=null?`${f0(r.exact)} held-out exact · ${r.shipped}/${r.fields} fields ship · ${r.n_cells} cells`:esc(r.detail||'')}));
