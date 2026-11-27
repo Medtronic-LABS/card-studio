@@ -107,7 +107,9 @@ def train(config, model, train_loader, val_loader, vocab, ckpt=None, log=print, 
             if sched is not None and st.get("sched") is not None: sched.load_state_dict(st["sched"])
             es.load(st["early_stop"]); history = st.get("history", []); start = st["epoch"] + 1
     for ep in range(start, cfg["loop"]["epochs"] + 1):
-        if cp and cp.stop_requested(): stopped = True; break
+        if cp:
+            cp.wait_if_paused()          # each epoch's -last checkpoint is already written below, so a pause here needs no extra save
+            if cp.stop_requested(): stopped = True; break
         train_loss = train_epoch(model, train_loader, opt, vocab, cfg["loop"]["grad_clip"], device)
         val = evaluate(model, val_loader, vocab, device)
         improved = es.update(ep, val)

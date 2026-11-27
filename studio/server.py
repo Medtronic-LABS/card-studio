@@ -166,8 +166,9 @@ def train_status():
         return {"state": "none"}
     st = json.loads((d / "status.json").read_text())
     alive = _proc is not None and _proc.poll() is None
-    stale = time.time() - (d / "status.json").stat().st_mtime > 900
-    state = st["stage"] if st["stage"] in ("done", "error", "stopped") else ("running" if alive or not stale else "stalled")
+    paused = alive and (d / "PAUSE").exists() and st["stage"] not in ("done", "error", "stopped")          # waiting at an epoch end, process alive, status.json not rewritten
+    stale = time.time() - (d / "status.json").stat().st_mtime > 900 and not paused
+    state = "paused" if paused else st["stage"] if st["stage"] in ("done", "error", "stopped") else ("running" if alive or not stale else "stalled")
     out = {"state": state, "run": d.name, **st}
     out["resumable"] = bool(st.get("resumable")) and not alive and (d / "trainer_args.json").exists()
     out["running"] = alive
@@ -242,6 +243,23 @@ def stop_training():
     return {"run": d.name, "stopping": True}
 
 
+def pause_training():
+    """Ask the running training to wait at the end of its current epoch without exiting (it saves a checkpoint first): write PAUSE in its run directory."""
+    d = _cur["dir"]
+    if _proc is None or _proc.poll() is not None or d is None:
+        raise ValueError("no training run is running, so there is nothing to pause")
+    (d / "PAUSE").write_text("pause\n")
+    return {"run": d.name, "pausing": True}
+
+
+def unpause_training():
+    d = _cur["dir"]
+    if _proc is None or _proc.poll() is not None or d is None:
+        raise ValueError("no training run is running")
+    (d / "PAUSE").unlink(missing_ok=True)
+    return {"run": d.name, "pausing": False}
+
+
 def resume_training(req):
     """Continue a stopped (or failed) run from its checkpoints: python trainer.py RUN_DIR --resume. Same one-heavy-job rule as a new run."""
     global _proc
@@ -254,8 +272,9 @@ def resume_training(req):
     try: st = json.loads((d / "status.json").read_text())
     except (OSError, ValueError): raise ValueError("this run has no readable status")
     if st.get("stage") == "done": raise ValueError("this run already finished: nothing to resume")
-    try: (d / "STOP").unlink()
-    except OSError: pass
+    for f in ("STOP", "PAUSE"):
+        try: (d / f).unlink()
+        except OSError: pass
     st.update(stage="labels", detail="resuming", resumable=False)
     (d / "status.json").write_text(json.dumps(st))
     _proc = subprocess.Popen([sys.executable, str(HERE / "trainer.py"), str(d), "--resume"], stdout=open(d / "log.txt", "a"), stderr=subprocess.STDOUT, cwd=str(HERE)); _cur["dir"] = d
@@ -615,6 +634,8 @@ class H(BaseHTTPRequestHandler):
             if self.path == "/api/train/start": return self._send(200, start_training(json.loads(body or b"{}")))
             if self.path == "/api/train/settings/check": return self._send(200, check_settings(json.loads(body or b"{}")))
             if self.path == "/api/train/stop": return self._send(200, stop_training())
+            if self.path == "/api/train/pause": return self._send(200, pause_training())
+            if self.path == "/api/train/unpause": return self._send(200, unpause_training())
             if self.path == "/api/train/resume": return self._send(200, resume_training(json.loads(body or b"{}")))
             if self.path.split("?")[0] == "/api/cleanup": return self._cleanup(body, parse_qs(urlparse(self.path).query))
             if self.path == "/api/pack/import": return self._import_pack(body)

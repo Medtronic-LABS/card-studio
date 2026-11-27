@@ -48,6 +48,24 @@ class Controls(unittest.TestCase):
             st, b = self.call("POST", "/api/train/stop", {})
         self.assertEqual((st, b["run"]), (200, d.name)); self.assertTrue((d / "STOP").exists())
 
+    def test_pause_with_nothing_running_is_400(self):
+        for path in ("/api/train/pause", "/api/train/unpause"): self.assertEqual(self.call("POST", path, {})[0], 400)
+
+    def test_pause_writes_PAUSE_unpause_removes_it_and_status_says_paused(self):
+        d = self.run_dir(stage="cv")
+        with mock.patch.object(server, "_proc", FakeProc(True)), mock.patch.dict(server._cur, {"dir": d}):
+            self.assertEqual(self.call("POST", "/api/train/pause", {})[1], {"run": d.name, "pausing": True}); self.assertTrue((d / "PAUSE").exists())
+            self.assertEqual(server.train_status()["state"], "paused")
+            import os, time; old = time.time() - 5000; os.utime(d / "status.json", (old, old))          # a paused run does not rewrite status.json: it must not be called stalled
+            self.assertEqual(server.train_status()["state"], "paused")
+            self.assertEqual(self.call("POST", "/api/train/unpause", {})[1]["pausing"], False); self.assertFalse((d / "PAUSE").exists())
+            self.assertEqual(server.train_status()["state"], "running")           # a live process is "running" whatever the age of status.json (as before)
+
+    def test_resume_clears_a_leftover_PAUSE(self):
+        d = self.run_dir("run-3"); (d / "PAUSE").write_text("x")
+        with mock.patch.object(server.subprocess, "Popen", return_value=FakeProc(True)): self.call("POST", "/api/train/resume", {"run": "run-3"})
+        self.assertFalse((d / "PAUSE").exists())
+
     def test_resume_refuses_bad_names_and_missing_runs(self):
         for bad in ("", "../x", "run-1/../../x", "run1", "run-abc", 5):
             self.assertEqual(self.call("POST", "/api/train/resume", {"run": bad})[0], 400, bad)

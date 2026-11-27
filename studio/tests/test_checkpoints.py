@@ -2,7 +2,7 @@
 import json, subprocess, sys, tempfile, unittest
 from pathlib import Path
 HERE = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(HERE)); sys.path.insert(0, str(HERE.parent / "work_phaseA"))
+sys.path.insert(0, str(HERE)); sys.path.insert(0, str(HERE.parent)); sys.path.insert(0, str(HERE.parent / "work_phaseA"))
 try:
     import torch
     import train as T
@@ -86,6 +86,36 @@ class CurvesTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             cp = T.Checkpointer({"dir": d + "/c", "name": "f", "stop": d + "/STOP"}); self.assertFalse(cp.stop_requested())
             (Path(d) / "STOP").write_text(""); self.assertTrue(cp.stop_requested())
+
+
+@needs_torch
+class PauseFileTest(unittest.TestCase):
+    """PAUSE holds the process at an epoch end without exiting; STOP still wins."""
+    def start(self, d, saves):
+        import threading, time
+        cp = T.Checkpointer({"dir": d + "/c", "name": "f", "stop": d + "/STOP"}); done = threading.Event()
+        th = threading.Thread(target=lambda: (cp.wait_if_paused(lambda: saves.append(1)), done.set()), daemon=True); th.start(); return cp, th, done
+
+    def test_no_pause_file_returns_at_once_and_saves_nothing(self):
+        with tempfile.TemporaryDirectory() as d:
+            saves = []; cp, th, done = self.start(d, saves); self.assertTrue(done.wait(2)); self.assertEqual(saves, []); self.assertFalse(cp.pause_requested())
+
+    def test_pause_saves_once_waits_and_continues_when_removed(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "PAUSE").write_text(""); saves = []; cp, th, done = self.start(d, saves)
+            self.assertFalse(done.wait(1.5)); self.assertEqual(saves, [1]); self.assertTrue(th.is_alive())          # still held, saved exactly once
+            (Path(d) / "PAUSE").unlink(); self.assertTrue(done.wait(3))
+
+    def test_stop_during_a_pause_releases_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "PAUSE").write_text(""); saves = []; cp, th, done = self.start(d, saves)
+            self.assertFalse(done.wait(1.2)); (Path(d) / "STOP").write_text(""); self.assertTrue(done.wait(3)); self.assertTrue(cp.stop_requested())
+
+    def test_htr_checkpointer_has_the_same_pause(self):
+        import htr.train.tracking as TR
+        with tempfile.TemporaryDirectory() as d:
+            cp = TR.Checkpointer({"dir": d + "/c", "name": "f", "stop": d + "/STOP"}); self.assertFalse(cp.pause_requested())
+            (Path(d) / "PAUSE").write_text(""); self.assertTrue(cp.pause_requested()); (Path(d) / "STOP").write_text(""); cp.wait_if_paused()          # STOP: does not block
 
 
 class ResumeArgsTest(unittest.TestCase):

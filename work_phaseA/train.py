@@ -226,6 +226,13 @@ class Checkpointer:
         self._save(state, self.path(f"e{ep:03d}")); prune_numbered(self.dir, self.name, self.keep)
     def due(self, ep): return self.every > 0 and ep % self.every == 0
     def stop_requested(self): return bool(self.stop_file) and Path(self.stop_file).exists()
+    def pause_requested(self): return bool(self.stop_file) and (Path(self.stop_file).parent / "PAUSE").exists()
+    def wait_if_paused(self, save=None):
+        """Called once an epoch is fully recorded. While RUN_DIR/PAUSE exists (and STOP does not) the process stays alive and waits here, so a run can be
+        inspected and carried on without a restart. `save` writes the -last checkpoint once on entering the pause, so a pause the process does not survive can still be resumed."""
+        if not self.pause_requested() or self.stop_requested(): return
+        if save: save()
+        while self.pause_requested() and not self.stop_requested(): time.sleep(1)
     def write_curves(self, rows):
         if self.curves: write_json_atomic(self.curves, rows)
     def load_last(self):
@@ -280,8 +287,9 @@ def finetune(pre_state, train_rows, val_rows, cfg, seed=0, max_epochs=300, patie
             cp.write_curves([dict(epoch=h["epoch"], loss=h["loss"], val_exact=h["val_exact"], val_cer=h["val_cer"], val_loss=h["val_loss"], lr=h["lr"], best=h["epoch"] == es.best_ep) for h in hist])
             def full(): return {"model": model.state_dict(), "opt": opt.state_dict(), "sched": sch.state_dict() if sch else None, "epoch": ep, "hist": hist, "es": es.state(), "rng": _rng_get(dl), "best_path": str(cp.path("best"))}
             if cp.due(ep): cp.save_numbered(ep, model.state_dict()); cp.save_last(full())
-            if not es.should_stop(ep) and ep < max_epochs and cp.stop_requested():
-                cp.save_last(full()); stopped = True; break
+            if not es.should_stop(ep) and ep < max_epochs:
+                cp.wait_if_paused(lambda: cp.save_last(full()))
+                if cp.stop_requested(): cp.save_last(full()); stopped = True; break
     if best is not None and not stopped and cfg.get("restore", "best") == "best": model.load_state_dict(best)
     b = es.best or {"exact": 0.0, "cer": 0.0, "loss": 0.0}
     return model, dict(best_epoch=es.best_ep, val_exact=b["exact"], val_cer=b["cer"], val_loss=b["loss"], epochs_run=ep, hist=hist, stopped=stopped, restored=cfg.get("restore", "best"),

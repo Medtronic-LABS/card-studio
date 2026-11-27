@@ -2,7 +2,7 @@
 `work_phaseA/train.py:EarlyStop` (same monitor/min_delta/patience/tie-break contract) generalized to a lower-is-better
 `cer_grapheme`/`cer_codepoint` monitor alongside the legacy `exact`/`loss`. `Checkpointer` is the same port, adapted to this
 package's checkpoint dict shape (model/opt/sched/scaler/RNG/epoch/vocab sha, per M1's design)."""
-import json, os, re
+import json, os, re, time
 from pathlib import Path
 
 
@@ -78,6 +78,13 @@ class Checkpointer:
 
     def due(self, ep): return self.every > 0 and ep % self.every == 0
     def stop_requested(self): return bool(self.stop_file) and Path(self.stop_file).exists()
+    def pause_requested(self): return bool(self.stop_file) and (Path(self.stop_file).parent / "PAUSE").exists()
+    def wait_if_paused(self, save=None):
+        """Called once an epoch is fully recorded. While RUN_DIR/PAUSE exists (and STOP does not) the process stays alive and waits here, so a run can be
+        inspected and carried on without a restart. `save` writes the -last checkpoint once on entering the pause, so a pause the process does not survive can still be resumed."""
+        if not self.pause_requested() or self.stop_requested(): return
+        if save: save()
+        while self.pause_requested() and not self.stop_requested(): time.sleep(1)
 
     def write_curves(self, rows):
         if self.curves: write_json_atomic(self.curves, rows)

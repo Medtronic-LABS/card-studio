@@ -140,7 +140,9 @@ def train_fixed(pre, rows, epochs, seed=0, cfg=CFG, arch=None, ck=None):
             def full(): return {"model": model.state_dict(), "opt": opt.state_dict(), "sched": sch.state_dict() if sch else None, "epoch": ep, "epochs": epochs, "hist": hist, "rng": T._rng_get(dl)}
             if cp.due(ep): cp.save_numbered(ep, model.state_dict()); cp.save_last(full())
             if ep == epochs: cp.save_last(full())
-            elif cp.stop_requested(): cp.save_last(full()); return None
+            else:
+                cp.wait_if_paused(lambda: cp.save_last(full()))
+                if cp.stop_requested(): cp.save_last(full()); return None
     return model
 
 
@@ -178,7 +180,7 @@ def main():
         if not (run / "trainer_args.json").is_file(): ap.error(f"cannot resume: {run / 'trainer_args.json'} not found (not a run directory this trainer started)")
         saved = json.loads((run / "trainer_args.json").read_text()); settings_raw = saved.get("settings_raw")
         for k, v in saved["args"].items(): setattr(a, k, v)
-        a.resume = True; (run / "STOP").unlink(missing_ok=True)          # the STOP that ended the last run must not end this one
+        a.resume = True; (run / "STOP").unlink(missing_ok=True); (run / "PAUSE").unlink(missing_ok=True)          # the STOP (or a PAUSE) left over from the last run must not hold this one
     fixed = a.val_frac is not None          # after the resume block: a resumed run takes its split mode from trainer_args.json
     run.mkdir(parents=True, exist_ok=True); t0 = time.time(); fold_epochs = {}
     def status(stage, detail="", **kw):
