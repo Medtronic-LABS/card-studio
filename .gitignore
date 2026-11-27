@@ -10,6 +10,7 @@ studio/curves/
 studio/pretrained/
 studio/capacity/
 studio/datasets/
+studio/seedexp/
 studio/.venv-labelstudio/
 studio/.venv-tflite/
 studio/labelstudio.json

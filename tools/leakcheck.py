@@ -14,7 +14,7 @@ NAMES_OK = {".gitignore", "LICENSE", "NOTICE", "requirements.txt"}
 JSON_OK = ["cardpack/schema/*.json", "cardpack/reference/grammar_vectors.json", "model_meta.json", "docs/screenshots/MANIFEST.json", "docs/status.json", "studio/static/openapi.json"]
 DENY_EXT = {".onnx", ".tflite", ".pt", ".pth", ".ckpt", ".cardpack", ".csv", ".tsv", ".pdf", ".ipynb", ".npy", ".npz", ".h5", ".hdf5", ".zip", ".gz", ".tar", ".jpg", ".jpeg",
             ".gif", ".bmp", ".tif", ".tiff", ".heic", ".webp", ".db", ".sqlite", ".pkl", ".pickle", ".log", ".docx", ".xlsx", ".mp4", ".mov"}
-DENY_DIRS = {"work", "data", "runs", "uploads", "templates", "imports", "experiments", "out", "crops", "aligned", "raw", "cards", "curves", "pretrained", "capacity", "datasets"}
+DENY_DIRS = {"work", "data", "runs", "uploads", "templates", "imports", "experiments", "out", "crops", "aligned", "raw", "cards", "curves", "pretrained", "capacity", "datasets", "seedexp"}
 SKIP_CONTENT = {"studio/static/vendor/tabler.min.css", "studio/static/vendor/swagger-ui.css", "studio/static/vendor/swagger-ui-bundle.js"}   # vendored third-party: allowed, not scanned or size-limited
 MAX_BYTES = 700_000
 PATTERNS = [

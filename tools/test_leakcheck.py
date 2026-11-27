@@ -30,9 +30,9 @@ class Check(unittest.TestCase):
         for rel in ("crop.jpg", "reader.onnx", "labels.csv", "nb.ipynb", "card.pdf", "photo.heic"): self.assertTrue(any(rel in o for o in out), rel)
 
     def test_data_directories_are_refused_even_for_innocent_files(self):
-        for d in ("work", "data", "studio/runs", "studio/uploads", "studio/imports", "studio/experiments", "studio/datasets", "cardpack/out"): self.put(f"{d}/note.txt", "hello")
-        self.assertEqual(len(self.found()), 8)
-        self.put("studio/datasets.py", "import cards\n"); self.assertEqual(len(self.found()), 8)          # the module of that name is code, not data
+        for d in ("work", "data", "studio/runs", "studio/uploads", "studio/imports", "studio/experiments", "studio/datasets", "studio/seedexp", "cardpack/out"): self.put(f"{d}/note.txt", "hello")
+        self.assertEqual(len(self.found()), 9)
+        self.put("studio/datasets.py", "import cards\n"); self.assertEqual(len(self.found()), 9)          # the module of that name is code, not data
 
     def test_unregistered_png_is_refused_registered_screenshot_allowed(self):
         self.put("docs/stray.png", PNG); self.put("studio/crop.png", PNG)
