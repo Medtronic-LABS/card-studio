@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cardpack"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))   # the card-studio root, for `import htr`
 import cardpack as cp
 from detect import detect_layout, load_normalized, match_score
-import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize, labruns, pretrained, external, extreader, testset, seedexp, datachecks, settings as train_settings
+import gridconv, corrections, history, deskew, cleanup, mlstats, analysis, experiments, provenance, cards, scans, labeling, labelstudio, tflite_export, suggest, datasize, labruns, pretrained, external, extreader, testset, seedexp, datachecks, datasets, settings as train_settings
 from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
@@ -597,6 +597,7 @@ class H(BaseHTTPRequestHandler):
         if m:
             try: return self._send(200, run_curves(m[1]))
             except ValueError as e: return self._err(400, str(e))
+        if p == "/api/datasets": return self._send(200, datasets.overview())
         m = re.fullmatch(r"/api/card/([\w-]{1,40})/split/preview", p)
         if m:
             if not cards.exists(m[1]): return self._err(404, "no such card")

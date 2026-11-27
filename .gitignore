@@ -9,6 +9,7 @@ studio/cards/
 studio/curves/
 studio/pretrained/
 studio/capacity/
+studio/datasets/
 studio/.venv-labelstudio/
 studio/.venv-tflite/
 studio/labelstudio.json

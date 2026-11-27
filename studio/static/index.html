@@ -116,6 +116,7 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}.side input,.
  </div>
  <div class="view hide" id="v-label"><div class="card"><h2>Label a card's cells <span class="tag">type what each cut cell says; that is what the reader is trained on</span></h2><div id="lcard" class="tag">loading…</div><div id="lwork"></div><div id="lstudio" class="tag" style="margin-top:14px"></div></div>
   <div class="card"><h2>ANC card and imported labels <span class="tag">the first card keeps its own labeler</span></h2><div id="lbody" class="tag">loading…</div></div></div>
+ <div class="view hide" id="v-datasets"><div class="card"><h2>Datasets <span class="tag">every card type side by side: labels, pages, writers, test set and whether the data checks pass</span> <button class="btn" onclick="dsetLoad()">Refresh</button></h2><div id="dsetbody" class="tag">loading…</div></div></div>
  <div class="view hide" id="v-review"><div class="card">
   <h2>Review labels <span class="tag">approve, reject or flag before a label can train on; a rejected one never trains</span></h2>
   <div class="row"><label>Card <select id="rvcard" onchange="rvCard(this.value)"></select></label>
@@ -197,6 +198,7 @@ label{display:block;font-size:12px;color:var(--mut);margin-top:8px}.side input,.
 <script src="/js/train.js"></script>
 <script src="/js/label.js"></script>
 <script src="/js/review.js"></script>
+<script src="/js/datasets.js"></script>
 <script src="/js/history.js"></script>
 <script src="/js/playground.js"></script>
 <script src="/js/cleanuplab.js"></script>
